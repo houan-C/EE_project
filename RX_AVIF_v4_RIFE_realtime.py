@@ -232,35 +232,10 @@ def on_mouse(event, x, y, flags, param):
             super_res_on = not super_res_on
             print(f"[UI] Super-Resolution: {'ON' if super_res_on else 'OFF'}")
 
-# ====================================================================
-# === GRID & BLENDING LOGIC ===
-# ====================================================================
-GRID_ROWS = 6
-GRID_COLS = 8
-
-def get_feathered_mask(block_w, block_h, r, c, grid_rows, grid_cols, bitmask, feather_px=6, truncate_px=2):
-    mask = np.ones((block_h, block_w), dtype=np.float32)
-    total_edge = feather_px + truncate_px
-    if r > 0 and not (bitmask & (1 << ((r - 1) * grid_cols + c))):
-        for y in range(total_edge):
-            val = 0.0 if y < truncate_px else (y - truncate_px) / feather_px
-            mask[y, :] *= val
-    if r < grid_rows - 1 and not (bitmask & (1 << ((r + 1) * grid_cols + c))):
-        for y in range(total_edge):
-            val = 0.0 if y < truncate_px else (y - truncate_px) / feather_px
-            mask[block_h - y - 1, :] *= val
-    if c > 0 and not (bitmask & (1 << (r * grid_cols + c - 1))):
-        for x in range(total_edge):
-            val = 0.0 if x < truncate_px else (x - truncate_px) / feather_px
-            mask[:, x] *= val
-    if c < grid_cols - 1 and not (bitmask & (1 << (r * grid_cols + c + 1))):
-        for x in range(total_edge):
-            val = 0.0 if x < truncate_px else (x - truncate_px) / feather_px
-            mask[:, block_w - x - 1] *= val
-    return np.expand_dims(mask, axis=2)
+# (Grid & Blending logic removed - using simplified BBox + JPEG protocol)
 
 # ====================================================================
-# === THREAD 1: Serial Reader (v4 Motion Protocol) ===
+# === THREAD 1: Serial Reader (Simplified BBox + JPEG Protocol) ===
 # ====================================================================
 def serial_reader_thread():
     global running, right_count, wrong_count
@@ -275,9 +250,10 @@ def serial_reader_thread():
         running = False
         return
 
-    header_magic = b'AVIF'
-    header_format = '<4sBQHHIffffff'
-    header_size = struct.calcsize(header_format)  # 45 bytes
+    # '<4sBhhHHI' = Magic(4) + PktType(1) + dx(2) + dy(2) + X(2) + Y(2) + PayloadLen(4) = 17 bytes
+    header_magic  = b'AVIF'
+    header_format = '<4sBhhHHI'
+    header_size   = struct.calcsize(header_format)
     current_bg = None
     rssi = 0
 
@@ -289,7 +265,7 @@ def serial_reader_thread():
                 continue
             chunk.extend(data)
 
-            # --- DSSS MAC Layer Parsing (Assuming original parsing approach) ---
+            # --- DSSS MAC Layer Parsing ---
             while len(chunk) >= 3:
                 payloadLen = chunk[0]
                 if len(chunk) < payloadLen + 3:
@@ -298,122 +274,112 @@ def serial_reader_thread():
                 buffer.extend(chunk[1: payloadLen + 1])
                 chunk = chunk[payloadLen + 3:]
 
-            # --- AVIF v4 Protocol Decode ---
+            # --- Protocol Decode ---
             while True:
                 idx = buffer.find(header_magic)
                 if idx == -1:
-                    # Keep the last few bytes in case magic is split across chunks
                     if len(buffer) > 3:
                         buffer = buffer[-3:]
                     break
-                
                 if idx > 0:
                     buffer = buffer[idx:]
                     idx = 0
-
                 if len(buffer) < header_size:
                     break
 
-                header_bytes = buffer[:header_size]
-                unpacked = struct.unpack(header_format, header_bytes)
-                magic, pkt_type, bitmask, full_w, full_h, payload_len = unpacked[:6]
-                matrix_flat = unpacked[6:]
+                unpacked = struct.unpack(header_format, buffer[:header_size])
+                magic, pkt_type, dx, dy, crop_x, crop_y, payload_len = unpacked
 
-                if payload_len > 1_000_000: # Protect against memory blowup from corrupted data
-                    buffer = buffer[4:] # discard faulty magic
+                if payload_len > 2_000_000:
+                    buffer = buffer[4:]
                     wrong_count += 1
                     continue
 
                 if len(buffer) < header_size + payload_len:
-                    break # Wait for complete payload
+                    break
 
-                frame_data = buffer[header_size : header_size + payload_len]
+                frame_data = buffer[header_size: header_size + payload_len]
 
-                # --- Decode and Update Frame ---
                 try:
                     img = Image.open(io.BytesIO(frame_data))
-                    img.load() # Force decode to catch truncation errors immediately
+                    img.load()
                     bgr_patch = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
                     if pkt_type == 0:
-                        # Full Frame
+                        # Full Frame (AVIF) — replace background entirely
                         current_bg = bgr_patch
+
                     elif pkt_type == 1:
-                        # Grid Frame (Macroblocks)
-                        if current_bg is None or current_bg.shape[1] != full_w or current_bg.shape[0] != full_h:
-                            if current_bg is not None:
-                                current_bg = cv2.resize(current_bg, (full_w, full_h))
-                            else:
-                                current_bg = np.zeros((full_h, full_w, 3), dtype=np.uint8)
+                        # Partial Frame (JPEG) — apply GMC then paste patch
+                        if current_bg is None:
+                            buffer = buffer[header_size + payload_len:]
+                            continue
+
+                        h_bg, w_bg = current_bg.shape[:2]
+
+                        # GMC using np.roll — integer pixel shift, zero blur
+                        if dx != 0 or dy != 0:
+                            current_bg = np.roll(current_bg, dy, axis=0)
+                            current_bg = np.roll(current_bg, dx, axis=1)
+                            # Fill the newly exposed edge strips with black to avoid wrap-around artifacts
+                            if dy > 0:  current_bg[:dy, :] = 0
+                            elif dy < 0: current_bg[dy:, :] = 0
+                            if dx > 0:  current_bg[:, :dx] = 0
+                            elif dx < 0: current_bg[:, dx:] = 0
+
+                        ph, pw = bgr_patch.shape[:2]
+                        y1, x1 = crop_y, crop_x
+                        y2 = min(y1 + ph, h_bg)
+                        x2 = min(x1 + pw, w_bg)
                         
-                        # ====== NEW: APPLY GLOBAL MOTION COMPENSATION ======
-                        # 將 TX 所計算的無人機鏡頭平移矩陣同步套用到 RX 的舊畫布上，防範區塊錯位！
-                        M = np.array(matrix_flat, dtype=np.float32).reshape(2, 3)
-                        if not np.allclose(M, np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=np.float32), atol=1e-4):
-                            current_bg = cv2.warpAffine(current_bg, M, (full_w, full_h), borderMode=cv2.BORDER_REPLICATE)
-                        
-                        block_w = full_w // GRID_COLS
-                        block_h = full_h // GRID_ROWS
-                        pop_y = 0
-                        
-                        for r in range(GRID_ROWS):
-                            for c in range(GRID_COLS):
-                                if (bitmask & (1 << (r * GRID_COLS + c))) != 0:
-                                    if pop_y + block_h <= bgr_patch.shape[0]:
-                                        single_block = bgr_patch[pop_y : pop_y + block_h, :]
-                                        pop_y += block_h
-                                        
-                                        x1 = c * block_w
-                                        y1 = r * block_h
-                                        x2 = x1 + block_w
-                                        y2 = y1 + block_h
-                                        
-                                        if y2 <= current_bg.shape[0] and x2 <= current_bg.shape[1] and single_block.shape[1] == block_w:
-                                            bg_roi = current_bg[y1:y2, x1:x2].astype(np.float32)
-                                            
-                                            # 快速色彩均值匹配 (加裝安全鎖防止物理變更物件被染成背景色)
-                                            bg_mean = cv2.mean(bg_roi)[:3]
-                                            patch_mean = cv2.mean(single_block)[:3]
-                                            diff = np.array(bg_mean) - np.array(patch_mean)
-                                            # 閃爍通常在 ±8 範圍內。如果超過 ±8 絕對是跨物體(例如黑髮貼白牆)
-                                            # 限制位移量可以保護動態物體的原始色彩，完美融合光影微變
-                                            diff = np.clip(diff, -8.0, 8.0)
-                                            
-                                            # 施加平滑色偏
-                                            new_roi = np.clip(single_block.astype(np.float32) + diff, 0, 255)
-                                            
-                                            # 內縮捨棄污染邊緣 + 大幅度向內羽化
-                                            alpha = get_feathered_mask(block_w, block_h, r, c, GRID_ROWS, GRID_COLS, bitmask, feather_px=6, truncate_px=2)
-                                            
-                                            blended = new_roi * alpha + bg_roi * (1.0 - alpha)
-                                            current_bg[y1:y2, x1:x2] = blended.astype(np.uint8)
+                        if y2 > y1 and x2 > x1:
+                            target_roi = current_bg[y1:y2, x1:x2].astype(np.float32)
+                            patch_f = bgr_patch[:y2-y1, :x2-x1].astype(np.float32)
+
+                            # Colour Mean shift to eliminate luminance flickering boundaries
+                            bg_mean = cv2.mean(target_roi)[:3]
+                            patch_mean = cv2.mean(patch_f)[:3]
+                            diff_c = np.array(bg_mean) - np.array(patch_mean)
+                            diff_c = np.clip(diff_c, -8.0, 8.0)
+                            patch_f = np.clip(patch_f + diff_c, 0, 255)
+
+                            # Soft Alpha Feathering for sub-pixel offset & edge transitions
+                            feather_px = 8
+                            alpha = np.ones((y2-y1, x2-x1, 1), dtype=np.float32)
+                            
+                            for i in range(feather_px):
+                                val = i / feather_px
+                                if y1 > 0: alpha[i, :, 0] = np.minimum(alpha[i, :, 0], val)
+                                if y2 < h_bg: alpha[-(i+1), :, 0] = np.minimum(alpha[-(i+1), :, 0], val)
+                                if x1 > 0: alpha[:, i, 0] = np.minimum(alpha[:, i, 0], val)
+                                if x2 < w_bg: alpha[:, -(i+1), 0] = np.minimum(alpha[:, -(i+1), 0], val)
+
+                            blended = patch_f * alpha + target_roi * (1.0 - alpha)
+                            current_bg[y1:y2, x1:x2] = blended.astype(np.uint8)
+
                     else:
                         wrong_count += 1
                         buffer = buffer[header_size + payload_len:]
                         continue
 
-                    # Resize reconstructed frame to Target TRT resolution (320x240)
+                    # Resize to TRT resolution and push to RIFE queue
                     bgr_resized = cv2.resize(current_bg, (SRC_W, SRC_H))
                     right_count += 1
-                    
                     if not rife_input_q.full():
                         rife_input_q.put((bgr_resized, rssi))
-                        
-                    # SUCCESS: Safely advance buffer past the decoded payload
+
                     buffer = buffer[header_size + payload_len:]
 
-                except Exception as e:
+                except Exception:
                     wrong_count += 1
-                    # FAILURE: Payload corrupted or payload_len wrong.
-                    # ONLY discard the 'AVIF' magic bytes to quickly resync on the next valid packet.
-                    buffer = buffer[4:]
+                    buffer = buffer[4:]  # Resync
 
-        except Exception as e:
-            # print(f"Serial err: {e}")
+        except Exception:
             time.sleep(0.05)
 
     ser.close()
     print("[Serial] Stopped")
+
 
 
 # ====================================================================
