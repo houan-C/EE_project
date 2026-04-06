@@ -336,23 +336,36 @@ def serial_reader_thread():
                             target_roi = current_bg[y1:y2, x1:x2].astype(np.float32)
                             patch_f = bgr_patch[:y2-y1, :x2-x1].astype(np.float32)
 
-                            # Colour Mean shift to eliminate luminance flickering boundaries
+                            # ★ 色溫匹配：限制放寬到 ±12，更有效消除亮度邊界
                             bg_mean = cv2.mean(target_roi)[:3]
                             patch_mean = cv2.mean(patch_f)[:3]
                             diff_c = np.array(bg_mean) - np.array(patch_mean)
-                            diff_c = np.clip(diff_c, -8.0, 8.0)
+                            diff_c = np.clip(diff_c, -12.0, 12.0)
                             patch_f = np.clip(patch_f + diff_c, 0, 255)
 
-                            # Soft Alpha Feathering for sub-pixel offset & edge transitions
-                            feather_px = 8
-                            alpha = np.ones((y2-y1, x2-x1, 1), dtype=np.float32)
-                            
-                            for i in range(feather_px):
-                                val = i / feather_px
-                                if y1 > 0: alpha[i, :, 0] = np.minimum(alpha[i, :, 0], val)
-                                if y2 < h_bg: alpha[-(i+1), :, 0] = np.minimum(alpha[-(i+1), :, 0], val)
-                                if x1 > 0: alpha[:, i, 0] = np.minimum(alpha[:, i, 0], val)
-                                if x2 < w_bg: alpha[:, -(i+1), 0] = np.minimum(alpha[:, -(i+1), 0], val)
+                            # ★ 餘弦曲線羽化 (Cosine Feathering)，比線性漸層更平滑自然
+                            feather_px = 12
+                            ph_roi, pw_roi = y2 - y1, x2 - x1
+                            alpha = np.ones((ph_roi, pw_roi, 1), dtype=np.float32)
+
+                            for i in range(min(feather_px, ph_roi // 2)):
+                                # 0.5 * (1 - cos(pi * i / feather)) 產生 S 曲線，兩端變化率趨零
+                                val = 0.5 * (1.0 - np.cos(np.pi * i / feather_px))
+                                if y1 > 0:
+                                    alpha[i, :, 0] = np.minimum(alpha[i, :, 0], val)
+                                if y2 < h_bg:
+                                    alpha[-(i+1), :, 0] = np.minimum(alpha[-(i+1), :, 0], val)
+                            for i in range(min(feather_px, pw_roi // 2)):
+                                val = 0.5 * (1.0 - np.cos(np.pi * i / feather_px))
+                                if x1 > 0:
+                                    alpha[:, i, 0] = np.minimum(alpha[:, i, 0], val)
+                                if x2 < w_bg:
+                                    alpha[:, -(i+1), 0] = np.minimum(alpha[:, -(i+1), 0], val)
+
+                            # ★ Gaussian Blur 將 Alpha Mask 殘留的直角轉折徹底柔化
+                            alpha = cv2.GaussianBlur(alpha, (5, 5), 0)
+                            if alpha.ndim == 2:
+                                alpha = alpha[:, :, np.newaxis]
 
                             blended = patch_f * alpha + target_roi * (1.0 - alpha)
                             current_bg[y1:y2, x1:x2] = blended.astype(np.uint8)

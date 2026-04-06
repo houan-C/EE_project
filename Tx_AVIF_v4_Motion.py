@@ -94,6 +94,7 @@ force_full_frame = True
 frames_since_full = 0
 prev_gray = None
 rx_mock_bg = None  # 模擬 RX 端的背景，解決慢速移動與殘影
+prev_bbox = None   # 上一幀 BBox，用於時間平滑防止軌跡跳動
 
 accumulated_dx = 0.0
 accumulated_dy = 0.0
@@ -165,30 +166,11 @@ while True:
             # 模擬 RX 的移動背景操作
             M_sent = np.array([[1.0, 0.0, float(st.dx)], [0.0, 1.0, float(st.dy)]], dtype=np.float32)
             rx_mock_bg = cv2.warpAffine(rx_mock_bg, M_sent, (new_w, new_h))
-            # 貼上 RX 即將貼上的補丁（包含羽化與防閃爍設計，確保 TX 追蹤數學精確吻合）
+            # ★ TX mock 採用硬貼 (Hard Paste)，不做 feathering/color shift
+            # 這確保差分運算的數學精確度不會因為浮點累積漂移而衰退
             cy, cx = st.crop_y, st.crop_x
             ch, cw = st.crop_img.shape[:2]
-
-            target_roi = rx_mock_bg[cy:cy+ch, cx:cx+cw].astype(np.float32)
-            patch_f = st.crop_img.astype(np.float32)
-            
-            # 灰階均值色彩匹配
-            bg_mean = cv2.mean(target_roi)[0]
-            patch_mean = cv2.mean(patch_f)[0]
-            diff_c = np.clip(bg_mean - patch_mean, -8.0, 8.0)
-            patch_f = np.clip(patch_f + diff_c, 0, 255)
-            
-            feather_px = 8
-            alpha = np.ones((ch, cw), dtype=np.float32)
-            for i in range(feather_px):
-                val = i / feather_px
-                if cy > 0: alpha[i, :] = np.minimum(alpha[i, :], val)
-                if cy+ch < new_h: alpha[-(i+1), :] = np.minimum(alpha[-(i+1), :], val)
-                if cx > 0: alpha[:, i] = np.minimum(alpha[:, i], val)
-                if cx+cw < new_w: alpha[:, -(i+1)] = np.minimum(alpha[:, -(i+1)], val)
-                
-            blended = patch_f * alpha + target_roi * (1.0 - alpha)
-            rx_mock_bg[cy:cy+ch, cx:cx+cw] = blended.astype(np.uint8)
+            rx_mock_bg[cy:cy+ch, cx:cx+cw] = st.crop_img
 
     if prev_gray is None or prev_gray.shape != curr_gray.shape:
         prev_gray = curr_gray.copy()
@@ -235,7 +217,7 @@ while True:
     # ---- 2. 決定傳送模式 ----
     send_full = force_full_frame
     frames_since_full += 1
-    if frames_since_full >= 40:
+    if frames_since_full >= 60:
         send_full = True
 
     crop_x, crop_y = 0, 0
@@ -246,36 +228,51 @@ while True:
         motion_contours = [c for c in contours if cv2.contourArea(c) > 100]
 
         if not motion_contours:
-            # 畫面與 RX 端已經完美一致，不浪費頻寬傳送任何資料！
-            disp = frame_resized.copy()
-            cv2.putText(disp, "NO MOTION - PERFECT SYNC", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-            cv2.imshow('TX_AVIF_Motion_Control', disp)
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q') or key == 27: break
-            elif key == ord('f'): force_full_frame = True
-            continue
-
-        # 合併為單一 Bounding Box
-        x_min, y_min = new_w, new_h
-        x_max, y_max = 0, 0
-        for cnt in motion_contours:
-            x, y, w, h = cv2.boundingRect(cnt)
-            x_min = min(x_min, x)
-            y_min = min(y_min, y)
-            x_max = max(x_max, x + w)
-            y_max = max(y_max, y + h)
-
-        bbox_area = (x_max - x_min) * (y_max - y_min)
-        if bbox_area > new_w * new_h * 0.6:
-            send_full = True
+            # 沒有新差異但 prev_bbox 仍有「慣性殘留」時，仍然送出最後一幀 BBox 覆蓋殘影
+            if prev_bbox is not None:
+                x_min, y_min, x_max, y_max = prev_bbox
+                crop_x, crop_y = x_min, y_min
+                target_crop = frame_resized[y_min:y_max, x_min:x_max]
+                prev_bbox = None  # 殘影覆蓋幀只送一次
+            else:
+                disp = frame_resized.copy()
+                cv2.putText(disp, "NO MOTION - PERFECT SYNC", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+                cv2.imshow('TX_AVIF_Motion_Control', disp)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q') or key == 27: break
+                elif key == ord('f'): force_full_frame = True
+                continue
         else:
-            pad = 20
-            x_min = max(0, x_min - pad)
-            y_min = max(0, y_min - pad)
-            x_max = min(new_w, x_max + pad)
-            y_max = min(new_h, y_max + pad)
-            crop_x, crop_y = x_min, y_min
-            target_crop = frame_resized[y_min:y_max, x_min:x_max]
+            # 合併為單一 Bounding Box
+            x_min, y_min = new_w, new_h
+            x_max, y_max = 0, 0
+            for cnt in motion_contours:
+                x, y, w, h = cv2.boundingRect(cnt)
+                x_min = min(x_min, x)
+                y_min = min(y_min, y)
+                x_max = max(x_max, x + w)
+                y_max = max(y_max, y + h)
+
+            # ★ 時間平滑：與上一幀 BBox 取聯集，防止物件軌跡跳動斷裂
+            if prev_bbox is not None:
+                px_min, py_min, px_max, py_max = prev_bbox
+                x_min = min(x_min, px_min)
+                y_min = min(y_min, py_min)
+                x_max = max(x_max, px_max)
+                y_max = max(y_max, py_max)
+
+            bbox_area = (x_max - x_min) * (y_max - y_min)
+            if bbox_area > new_w * new_h * 0.6:
+                send_full = True
+            else:
+                pad = 30
+                x_min = max(0, x_min - pad)
+                y_min = max(0, y_min - pad)
+                x_max = min(new_w, x_max + pad)
+                y_max = min(new_h, y_max + pad)
+                crop_x, crop_y = x_min, y_min
+                target_crop = frame_resized[y_min:y_max, x_min:x_max]
+                prev_bbox = (x_min, y_min, x_max, y_max)
 
     # ---- 3. 編碼 (統一使用單一 BBox + AVIF) ----
     frame_rgb = cv2.cvtColor(target_crop, cv2.COLOR_BGR2RGB)
@@ -310,6 +307,7 @@ while True:
             if send_full:
                 force_full_frame = False
                 frames_since_full = 0
+                prev_bbox = None
         else:
             # 覆蓋未發送的上一幀！因為這幀並未發出，rx_mock_bg 完全不會收到！
             # 舊幀就好像不存在一樣，無損同步確保畫面完美連貫！
