@@ -256,6 +256,10 @@ def serial_reader_thread():
     header_size   = struct.calcsize(header_format)
     current_bg = None
     rssi = 0
+    # ★ 防抖：用 EMA 平滑 RX 端的 dx/dy，避免整數像素跳動造成畫面抖動
+    smooth_rx_dx = 0.0
+    smooth_rx_dy = 0.0
+    RX_SMOOTH = 0.6  # RX 端的位移平滑係數
 
     while running:
         try:
@@ -317,15 +321,23 @@ def serial_reader_thread():
 
                         h_bg, w_bg = current_bg.shape[:2]
 
-                        # GMC using np.roll — integer pixel shift, zero blur
+                        # ★ GMC: 用 warpAffine 取代 np.roll，支援更平滑的位移
                         if dx != 0 or dy != 0:
-                            current_bg = np.roll(current_bg, dy, axis=0)
-                            current_bg = np.roll(current_bg, dx, axis=1)
-                            # Fill the newly exposed edge strips with black to avoid wrap-around artifacts
-                            if dy > 0:  current_bg[:dy, :] = 0
-                            elif dy < 0: current_bg[dy:, :] = 0
-                            if dx > 0:  current_bg[:, :dx] = 0
-                            elif dx < 0: current_bg[:, dx:] = 0
+                            # EMA 平滑：避免幀間 ±1px 跳動
+                            smooth_rx_dx = smooth_rx_dx * (1 - RX_SMOOTH) + float(dx) * RX_SMOOTH
+                            smooth_rx_dy = smooth_rx_dy * (1 - RX_SMOOTH) + float(dy) * RX_SMOOTH
+                            
+                            # 只有平滑後結果超過 0.6px 才執行實際位移，避免微小抖動
+                            apply_dx = int(round(smooth_rx_dx))
+                            apply_dy = int(round(smooth_rx_dy))
+                            
+                            if abs(apply_dx) > 0 or abs(apply_dy) > 0:
+                                M = np.float32([[1, 0, apply_dx], [0, 1, apply_dy]])
+                                current_bg = cv2.warpAffine(current_bg, M, (w_bg, h_bg), 
+                                                           borderMode=cv2.BORDER_REPLICATE)
+                                # 消耗已用過的位移量
+                                smooth_rx_dx -= apply_dx
+                                smooth_rx_dy -= apply_dy
 
                         ph, pw = bgr_patch.shape[:2]
                         y1, x1 = crop_y, crop_x
@@ -336,20 +348,12 @@ def serial_reader_thread():
                             target_roi = current_bg[y1:y2, x1:x2].astype(np.float32)
                             patch_f = bgr_patch[:y2-y1, :x2-x1].astype(np.float32)
 
-                            # ★ 色溫匹配：限制放寬到 ±12，更有效消除亮度邊界
-                            bg_mean = cv2.mean(target_roi)[:3]
-                            patch_mean = cv2.mean(patch_f)[:3]
-                            diff_c = np.array(bg_mean) - np.array(patch_mean)
-                            diff_c = np.clip(diff_c, -12.0, 12.0)
-                            patch_f = np.clip(patch_f + diff_c, 0, 255)
-
-                            # ★ 餘弦曲線羽化 (Cosine Feathering)，比線性漸層更平滑自然
+                            # ★ 先算出羽化遮罩，然後只用「邊緣重疊帶」的像素來計算色溫差
                             feather_px = 12
                             ph_roi, pw_roi = y2 - y1, x2 - x1
                             alpha = np.ones((ph_roi, pw_roi, 1), dtype=np.float32)
 
                             for i in range(min(feather_px, ph_roi // 2)):
-                                # 0.5 * (1 - cos(pi * i / feather)) 產生 S 曲線，兩端變化率趨零
                                 val = 0.5 * (1.0 - np.cos(np.pi * i / feather_px))
                                 if y1 > 0:
                                     alpha[i, :, 0] = np.minimum(alpha[i, :, 0], val)
@@ -362,10 +366,20 @@ def serial_reader_thread():
                                 if x2 < w_bg:
                                     alpha[:, -(i+1), 0] = np.minimum(alpha[:, -(i+1), 0], val)
 
-                            # ★ Gaussian Blur 將 Alpha Mask 殘留的直角轉折徹底柔化
                             alpha = cv2.GaussianBlur(alpha, (5, 5), 0)
                             if alpha.ndim == 2:
                                 alpha = alpha[:, :, np.newaxis]
+
+                            # ★ 邊緣區域色溫匹配：只用 alpha<0.5 的像素（幾乎都是背景）來計算色差
+                            edge_mask = (alpha[:, :, 0] < 0.5) & (alpha[:, :, 0] > 0.01)
+                            if np.count_nonzero(edge_mask) > 10:
+                                bg_edge = target_roi[edge_mask]
+                                patch_edge = patch_f[edge_mask]
+                                diff_c = np.mean(bg_edge, axis=0) - np.mean(patch_edge, axis=0)
+                            else:
+                                diff_c = np.array(cv2.mean(target_roi)[:3]) - np.array(cv2.mean(patch_f)[:3])
+                            diff_c = np.clip(diff_c, -12.0, 12.0)
+                            patch_f = np.clip(patch_f + diff_c, 0, 255)
 
                             blended = patch_f * alpha + target_roi * (1.0 - alpha)
                             current_bg[y1:y2, x1:x2] = blended.astype(np.uint8)
@@ -415,14 +429,18 @@ def rife_thread(rife_ok):
                 display_q.put((frm, rs))
             continue
 
-        # --- Interpolate midpoint frame ---
+        # --- ★ Scene-Cut Detection: 如果兩幀差異太大，跳過補幀避免鬼影 ---
         if rife_ok:
-            try:
-                mid = infer_rife(prev[0], frm)
-                if not display_q.full():
-                    display_q.put((mid, prev[1]))
-            except Exception as e:
-                print(f"[RIFE] Inference error: {e}")
+            frame_diff = cv2.absdiff(prev[0], frm)
+            mean_diff = np.mean(frame_diff)
+            # ★ 均差 > 60 表示場景大幅跳變（例如 Full Frame 重置），補幀會產生融合偽影
+            if mean_diff < 60:
+                try:
+                    mid = infer_rife(prev[0], frm)
+                    if not display_q.full():
+                        display_q.put((mid, prev[1]))
+                except Exception as e:
+                    print(f"[RIFE] Inference error: {e}")
 
         # --- Push current frame ---
         if not display_q.full():
@@ -477,11 +495,11 @@ def main():
                 pass
 
             # === Drain excess to respect <700ms latency ===
-            # At 24fps, 17 frames ≈ 700ms
+            # ★ 簡單直接：只保留最新一幀，避免 re-insert 造成時間序錯亂（跳針的元凶）
             while display_q.qsize() > 17:
                 try:
                     proc_frame, rssi = display_q.get_nowait()
-                    new_frame = proc_frame  # always keep the newest
+                    new_frame = proc_frame
                 except queue.Empty:
                     break
 
