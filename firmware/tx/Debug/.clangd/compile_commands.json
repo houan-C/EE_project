@@ -1,0 +1,32 @@
+[
+   {
+      "directory" : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug",
+      "command"   : "clang++ -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/kernel/tirtos7/packages\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/lib/clang/15.0.7/include\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg\" -DDeviceFamily_CC13X2 -xc",
+      "file"      : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg/ti_devices_config.c"
+   },
+   {
+      "directory" : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug",
+      "command"   : "clang++ -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/kernel/tirtos7/packages\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/lib/clang/15.0.7/include\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg\" -DDeviceFamily_CC13X2 -xc",
+      "file"      : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg/ti_drivers_config.c"
+   },
+   {
+      "directory" : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug",
+      "command"   : "clang++ -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/kernel/tirtos7/packages\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/lib/clang/15.0.7/include\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg\" -DDeviceFamily_CC13X2 -xc",
+      "file"      : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg/ti_radio_config.c"
+   },
+   {
+      "directory" : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug",
+      "command"   : "clang++ -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/kernel/tirtos7/packages\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/lib/clang/15.0.7/include\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg\" -DDeviceFamily_CC13X2 -xc",
+      "file"      : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg/ti_sysbios_config.c"
+   },
+   {
+      "directory" : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug",
+      "command"   : "clang++ -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/kernel/tirtos7/packages\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/lib/clang/15.0.7/include\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg\" -DDeviceFamily_CC13X2 -xc",
+      "file"      : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/main_tirtos.c"
+   },
+   {
+      "directory" : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug",
+      "command"   : "clang++ -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/kernel/tirtos7/packages\" -I\"C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/armv7em-ti-none-eabihf/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c++/v1\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/lib/clang/15.0.7/include\" -isystem\"C:/ti/ti_cgt_arm_llvm_3.2.2.LTS/include/c\" -I\"C:/Users/jim94/workspace_ccstheia/rfPacketTx/Debug/syscfg\" -DDeviceFamily_CC13X2 -xc",
+      "file"      : "C:/Users/jim94/workspace_ccstheia/rfPacketTx/rfPacketTx.c"
+   }
+]
