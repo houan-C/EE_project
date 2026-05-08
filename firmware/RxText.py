@@ -5,32 +5,66 @@ import io
 from PIL import Image
 import pillow_avif
 
+import serial.tools.list_ports
+
 # ====================================================================
 # === 🐾 核心參數對齊 ===
 # ====================================================================
-COM_PORT   = "COM11" # 🐾 請改成你 RX 板子的 COM！
 BAUD_RATE  = 921600
 # 接收格式：[Len(1)] + [Data(200)] + [RSSI(1)] + [Dummy(1)] = 203
 CHUNK_SIZE = 203 
 
-def run_rx():
+def find_board(expected_role):
+    ports = list(serial.tools.list_ports.comports())
+    if not ports:
+        print("[唔嗚～] 沒有找到任何 COM Port！請檢查裝置是否連接。")
+        return None
+        
+    print(f"\n[喵～] 找到以下裝置，請選擇你的 {expected_role} 板子：")
+    for i, port in enumerate(ports):
+        print(f"[{i}] {port.device} - {port.description}")
+        
     try:
-        ser = serial.Serial(COM_PORT, BAUD_RATE, timeout=0.01)
-        print(f"[喵～] 成功開啟 {COM_PORT}，守候影像碎片中...")
+        choice = input(f"\n請輸入 {expected_role} 的號碼 (例如 0): ")
+        choice = int(choice)
+        if 0 <= choice < len(ports):
+            ser = serial.Serial(ports[choice].device, BAUD_RATE, timeout=0.01)
+            print(f"[喵～] 成功開啟 {ports[choice].device}！")
+            return ser
+        else:
+            print("[唔嗚～] 號碼超出範圍喵！")
     except Exception as e:
-        print(f"[唔嗚～] 開啟序列埠失敗: {e}"); return
+        print(f"[唔嗚～] 輸入無效或無法開啟序列埠: {e}")
+        
+    return None
 
-    buffer = bytearray()
+def run_rx():
+    ser = find_board('RX')
+    if ser is None:
+        print("[唔嗚～] 找不到 RX 板子，請確定已經燒錄且插上電腦喵！")
+        return
+    
+    # 回復原本的 timeout 設定
+    ser.timeout = 0.01
+
+    buffer = bytearray()  # 存放乾淨的影像資料
+    raw_buffer = bytearray() # 存放序列埠進來的原始資料
     header = b'ftypavif' # AVIF 的指紋標頭喵！
 
     while True:
-        data = ser.read(CHUNK_SIZE)
+        # 讀取目前序列埠中所有可用的資料
+        data = ser.read(ser.in_waiting or 1)
         if data:
-            # 🐾 按照協議拆解：中間 200 Bytes 才是資料
-            if len(data) == CHUNK_SIZE:
-                payload = data[1:201]
+            raw_buffer.extend(data)
+            
+            # 🐾 按照協議拆解：每 203 Bytes 是一包
+            while len(raw_buffer) >= CHUNK_SIZE:
+                chunk = raw_buffer[:CHUNK_SIZE]
+                raw_buffer = raw_buffer[CHUNK_SIZE:] # 移除已經處理的包
+                
+                payload = chunk[1:201]
                 # rssi 為 int8_t，在 python 讀取為 uint8，因此如果是負數 (通常是) 需減 256
-                rssi_raw = data[201]
+                rssi_raw = chunk[201]
                 rssi = rssi_raw - 256 if rssi_raw > 127 else rssi_raw
                 buffer.extend(payload)
 
@@ -56,7 +90,7 @@ def run_rx():
 
         if cv2.waitKey(1) & 0xFF == ord('q'): break
     
-    ##ser.close(); cv2.destroyAllWindows()
+    ser.close(); cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     run_rx()

@@ -66,7 +66,14 @@ rfPacketRx.o: ../rfPacketRx.c \
  C:/Users/jim94/workspace_ccstheia/rfPacketRx/RFQueue.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_data_entry.h \
  syscfg/ti_drivers_config.h \
- syscfg/ti_radio_config.h
+ syscfg/ti_radio_config.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/semaphore.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/sys/_internal.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/time.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/signal.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/sys/types.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/pthread.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/sched.h
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/GPIO.h:
 
@@ -199,3 +206,17 @@ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/dr
 syscfg/ti_drivers_config.h:
 
 syscfg/ti_radio_config.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/semaphore.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/sys/_internal.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/time.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/signal.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/sys/types.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/pthread.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/sched.h:

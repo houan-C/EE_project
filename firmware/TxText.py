@@ -5,19 +5,46 @@ import io
 from PIL import Image
 import pillow_avif # 🐾 確保有安裝這個喵！
 
+import serial.tools.list_ports
+
 # ====================================================================
 # === 🐾 核心參數對齊 ===
 # ====================================================================
-COM_PORT   = "COM6" # 🐾 請改成你 TX 板子的 COM！
 BAUD_RATE  = 921600  # 高速通道
 CHUNK_SIZE = 200     # 配合 C 程式碼的 UART_read(200)
 
-def run_tx():
+def find_board(expected_role):
+    ports = list(serial.tools.list_ports.comports())
+    if not ports:
+        print("[唔嗚～] 沒有找到任何 COM Port！請檢查裝置是否連接。")
+        return None
+        
+    print(f"\n[喵～] 找到以下裝置，請選擇你的 {expected_role} 板子：")
+    for i, port in enumerate(ports):
+        print(f"[{i}] {port.device} - {port.description}")
+        
     try:
-        ser = serial.Serial(COM_PORT, BAUD_RATE, timeout=1)
-        print(f"[喵～] 成功開啟 {COM_PORT}，開始噴發影像數據！")
+        choice = input(f"\n請輸入 {expected_role} 的號碼 (例如 0): ")
+        choice = int(choice)
+        if 0 <= choice < len(ports):
+            ser = serial.Serial(ports[choice].device, BAUD_RATE, timeout=1)
+            print(f"[喵～] 成功開啟 {ports[choice].device}！")
+            return ser
+        else:
+            print("[唔嗚～] 號碼超出範圍喵！")
     except Exception as e:
-        print(f"[唔嗚～] 開啟序列埠失敗: {e}"); return
+        print(f"[唔嗚～] 輸入無效或無法開啟序列埠: {e}")
+        
+    return None
+
+def run_tx():
+    ser = find_board('TX')
+    if ser is None:
+        print("[唔嗚～] 找不到 TX 板子，請確定已經燒錄且插上電腦喵！")
+        return
+    
+    # 回復原本的 timeout 設定
+    ser.timeout = 1
 
     cap = cv2.VideoCapture(0)
     

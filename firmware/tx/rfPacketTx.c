@@ -106,7 +106,7 @@ void *mainThread(void *arg0)
         size_t bytesRead = 0;
         
         /* 🐾 步驟一：從 UART 讀取資料 */
-        /* 這裡會卡住直到 Python 送來 812 Bytes 的 AVIF 碎片 */
+        /* 這裡會卡住直到 Python 送來 200 Bytes 的 AVIF 碎片 */
         UART2_read(uart, packet, PAYLOAD_LENGTH, &bytesRead);
 
         if (bytesRead == PAYLOAD_LENGTH)
