@@ -18,9 +18,6 @@
  *                TICLANG C/C++ toolchain
  */
 
-/* libraries required for /ti/display */
--l"ti/display/lib/ticlang/m4f/display_cc13x2.a"
-
 /* libraries required for /ti/drivers/RF */
 -l"ti/drivers/rf/lib/ticlang/m4f/rf_multiMode_cc13x2.a"
 

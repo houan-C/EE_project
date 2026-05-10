@@ -32,9 +32,6 @@ rfPacketTx.o: ../rfPacketTx.c \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rom.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/gpio.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_gpio.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_prop_mailbox.h \
- syscfg/ti_drivers_config.h \
- syscfg/ti_radio_config.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/UART2.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/Power.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/power/PowerCC26XX.h \
@@ -67,7 +64,10 @@ rfPacketTx.o: ../rfPacketTx.c \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_adi.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/vims.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_vims.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/RingBuf.h
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/RingBuf.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_prop_mailbox.h \
+ syscfg/ti_drivers_config.h \
+ syscfg/ti_radio_config.h
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/posix/ticlang/unistd.h:
 
@@ -130,12 +130,6 @@ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/dr
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/gpio.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_gpio.h:
-
-C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_prop_mailbox.h:
-
-syscfg/ti_drivers_config.h:
-
-syscfg/ti_radio_config.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/UART2.h:
 
@@ -202,3 +196,9 @@ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/dr
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_vims.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/RingBuf.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_prop_mailbox.h:
+
+syscfg/ti_drivers_config.h:
+
+syscfg/ti_radio_config.h:

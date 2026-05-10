@@ -3,10 +3,7 @@
 syscfg/ti_drivers_config.o: syscfg/ti_drivers_config.c \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/DeviceFamily.h \
  syscfg/ti_drivers_config.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/display/Display.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/display/DisplayUart2.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dpl/SemaphoreP.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/UART2.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dma/UDMACC26XX.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/Power.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/List.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/power/PowerCC26XX.h \
@@ -50,8 +47,6 @@ syscfg/ti_drivers_config.o: syscfg/ti_drivers_config.c \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_adi.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/vims.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_vims.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/RingBuf.h \
- C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dma/UDMACC26XX.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_types.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/udma.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_udma.h \
@@ -65,11 +60,14 @@ syscfg/ti_drivers_config.o: syscfg/ti_drivers_config.c \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_gpio.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/rf/RF.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/rf/RFCC26X2.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dpl/SemaphoreP.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_common_cmd.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_mailbox.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_prop_cmd.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_ble_cmd.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_ieee_cmd.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/UART2.h \
+ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/RingBuf.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/uart2/UART2CC26X2.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_ints.h \
  C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/Board.h
@@ -78,13 +76,7 @@ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/DeviceFamily.h:
 
 syscfg/ti_drivers_config.h:
 
-C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/display/Display.h:
-
-C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/display/DisplayUart2.h:
-
-C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dpl/SemaphoreP.h:
-
-C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/UART2.h:
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dma/UDMACC26XX.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/Power.h:
 
@@ -172,10 +164,6 @@ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/dr
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_vims.h:
 
-C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/RingBuf.h:
-
-C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dma/UDMACC26XX.h:
-
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/inc/hw_types.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/udma.h:
@@ -202,6 +190,8 @@ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/rf/RF.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/rf/RFCC26X2.h:
 
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/dpl/SemaphoreP.h:
+
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_common_cmd.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_mailbox.h:
@@ -211,6 +201,10 @@ C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/dr
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_ble_cmd.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/devices/cc13x2_cc26x2/driverlib/rf_ieee_cmd.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/UART2.h:
+
+C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/utils/RingBuf.h:
 
 C:/ti/simplelink_cc13xx_cc26xx_sdk_8_32_00_07/source/ti/drivers/uart2/UART2CC26X2.h:
 

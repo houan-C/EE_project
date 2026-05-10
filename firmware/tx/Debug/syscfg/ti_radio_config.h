@@ -47,27 +47,27 @@ extern RF_TxPowerTable_Entry txPowerTable_2400_pa5[]; // 2400 MHz, 5 dBm
 
 
 //*********************************************************************************
-//  RF Setting:   Custom (50 kbps, 25 kHz Deviation, 2-GFSK, 100 kHz RX Bandwidth)
+//  RF Setting:   500 kbps, 190 kHz Deviation, 2-GFSK, 1150 kHz RX Bandwidth
 //
-//  PHY:          custom868
-//  Setting file: setting_tc106_custom.json
+//  PHY:          2gfsk500kbps154g
+//  Setting file: setting_tc178_154g.json
 //*********************************************************************************
 
 // PA table usage
-#define TX_POWER_TABLE_SIZE_custom868_0 TXPOWERTABLE_868_PA13_SIZE
+#define TX_POWER_TABLE_SIZE_2gfsk500kbps154g_0 TXPOWERTABLE_868_PA13_SIZE
 
-#define txPowerTable_custom868_0 txPowerTable_868_pa13
+#define txPowerTable_2gfsk500kbps154g_0 txPowerTable_868_pa13
 
 // TI-RTOS RF Mode object
-extern RF_Mode RF_prop_custom868_0;
+extern RF_Mode RF_prop_2gfsk500kbps154g_0;
 
 // RF Core API commands
-extern rfc_CMD_PROP_RADIO_DIV_SETUP_t RF_cmdPropRadioDivSetup_custom868_0;
-extern rfc_CMD_FS_t RF_cmdFs_custom868_0;
-extern rfc_CMD_PROP_TX_t RF_cmdPropTx_custom868_0;
-extern rfc_CMD_PROP_RX_t RF_cmdPropRx_custom868_0;
+extern rfc_CMD_PROP_RADIO_DIV_SETUP_t RF_cmdPropRadioDivSetup_2gfsk500kbps154g_0;
+extern rfc_CMD_FS_t RF_cmdFs_2gfsk500kbps154g_0;
+extern rfc_CMD_PROP_TX_ADV_t RF_cmdPropTxAdv_2gfsk500kbps154g_0;
+extern rfc_CMD_PROP_RX_ADV_t RF_cmdPropRxAdv_2gfsk500kbps154g_0;
 
 // RF Core API overrides
-extern uint32_t pOverrides_custom868_0[];
+extern uint32_t pOverrides_2gfsk500kbps154g_0[];
 
 #endif // _TI_RADIO_CONFIG_H_

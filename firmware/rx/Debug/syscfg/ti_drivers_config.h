@@ -39,15 +39,6 @@ extern "C" {
 
 
 /*
- *  ======== Display ========
- */
-
-extern const uint_least8_t                  CONFIG_Display_0_CONST;
-#define CONFIG_Display_0                    0
-#define CONFIG_TI_DRIVERS_DISPLAY_COUNT     1
-
-
-/*
  *  ======== GPIO ========
  */
 extern const uint_least8_t CONFIG_GPIO_RLED_CONST;

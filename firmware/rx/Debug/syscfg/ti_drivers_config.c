@@ -18,41 +18,6 @@
 #include "ti_drivers_config.h"
 
 /*
- *  ============================= Display =============================
- */
-
-#include <ti/display/Display.h>
-#include <ti/display/DisplayUart2.h>
-
-#define CONFIG_Display_COUNT 1
-
-
-#define Display_UART2BUFFERSIZE 1024
-static char displayUART2Buffer[Display_UART2BUFFERSIZE];
-
-DisplayUart2_Object displayUart2Object;
-
-const DisplayUart2_HWAttrs displayUart2HWAttrs = {
-    .uartIdx      = CONFIG_UART2_0,
-    .baudRate     = 921600,
-    .mutexTimeout = (unsigned int)(-1),
-    .strBuf       = displayUART2Buffer,
-    .strBufLen    = Display_UART2BUFFERSIZE
-};
-
-const Display_Config Display_config[CONFIG_Display_COUNT] = {
-    /* CONFIG_Display_0 */
-    /* XDS110 UART */
-    {
-        .fxnTablePtr = &DisplayUart2Min_fxnTable,
-        .object      = &displayUart2Object,
-        .hwAttrs     = &displayUart2HWAttrs
-    },
-};
-
-const uint_least8_t Display_count = CONFIG_Display_COUNT;
-
-/*
  *  =============================== DMA ===============================
  */
 
@@ -105,7 +70,7 @@ GPIO_PinConfig gpioPinConfigs[31] = {
     GPIO_CFG_NO_DIR, /* DIO_10 */
     GPIO_CFG_NO_DIR, /* DIO_11 */
     /* Owned by CONFIG_UART2_0 as RX */
-    GPIO_CFG_INPUT_INTERNAL | GPIO_CFG_IN_INT_NONE | GPIO_CFG_PULL_DOWN_INTERNAL, /* CONFIG_GPIO_UART2_0_RX */
+    GPIO_CFG_INPUT_INTERNAL | GPIO_CFG_IN_INT_NONE | GPIO_CFG_PULL_NONE_INTERNAL, /* CONFIG_GPIO_UART2_0_RX */
     /* Owned by CONFIG_UART2_0 as TX */
     GPIO_CFG_OUTPUT_INTERNAL | GPIO_CFG_OUT_STR_MED | GPIO_CFG_OUT_HIGH, /* CONFIG_GPIO_UART2_0_TX */
     GPIO_CFG_NO_DIR, /* DIO_14 */
@@ -190,8 +155,8 @@ const PowerCC26X2_Config PowerCC26X2_config = {
  * Platform-specific driver configuration
  */
 const RFCC26XX_HWAttrsV2 RFCC26XX_hwAttrs = {
-    .hwiPriority        = (~0),
-    .swiPriority        = (uint8_t)0,
+    .hwiPriority        = 0x20,
+    .swiPriority        = (uint8_t)1,
     .xoscHfAlwaysNeeded = true,
     .globalCallback     = NULL,
     .globalEventMask    = 0
@@ -216,36 +181,34 @@ const RFCC26XX_HWAttrsV2 RFCC26XX_hwAttrs = {
 
 UART2CC26X2_Object uart2CC26X2Objects[CONFIG_UART2_COUNT];
 
-static unsigned char uart2RxRingBuffer0[32];
-/* TX ring buffer allocated to be used for nonblocking mode */
-static unsigned char uart2TxRingBuffer0[32];
+static unsigned char uart2RxRingBuffer0[4096];
 
-ALLOCATE_CONTROL_TABLE_ENTRY(dmaUart1RxControlTableEntry, UDMA_CHAN_UART1_RX);
-ALLOCATE_CONTROL_TABLE_ENTRY(dmaUart1TxControlTableEntry, UDMA_CHAN_UART1_TX);
+ALLOCATE_CONTROL_TABLE_ENTRY(dmaUart0RxControlTableEntry, UDMA_CHAN_UART0_RX);
+ALLOCATE_CONTROL_TABLE_ENTRY(dmaUart0TxControlTableEntry, UDMA_CHAN_UART0_TX);
 
 static const UART2CC26X2_HWAttrs uart2CC26X2HWAttrs[CONFIG_UART2_COUNT] = {
   {
-    .baseAddr           = UART1_BASE,
-    .intNum             = INT_UART1_COMB,
+    .baseAddr           = UART0_BASE,
+    .intNum             = INT_UART0_COMB,
     .intPriority        = (~0),
     .rxPin              = CONFIG_GPIO_UART2_0_RX,
     .txPin              = CONFIG_GPIO_UART2_0_TX,
     .ctsPin             = GPIO_INVALID_INDEX,
     .rtsPin             = GPIO_INVALID_INDEX,
     .flowControl        = UART2_FLOWCTRL_NONE,
-    .powerId            = PowerCC26XX_PERIPH_UART1,
+    .powerId            = PowerCC26XX_PERIPH_UART0,
     .rxBufPtr           = uart2RxRingBuffer0,
     .rxBufSize          = sizeof(uart2RxRingBuffer0),
-    .txBufPtr           = uart2TxRingBuffer0,
-    .txBufSize          = sizeof(uart2TxRingBuffer0),
-    .txPinMux           = IOC_PORT_MCU_UART1_TX,
-    .rxPinMux           = IOC_PORT_MCU_UART1_RX,
-    .ctsPinMux          = IOC_PORT_MCU_UART1_CTS,
-    .rtsPinMux          = IOC_PORT_MCU_UART1_RTS,
-    .dmaTxTableEntryPri = &dmaUart1TxControlTableEntry,
-    .dmaRxTableEntryPri = &dmaUart1RxControlTableEntry,
-    .rxChannelMask      = 1 << UDMA_CHAN_UART1_RX,
-    .txChannelMask      = 1 << UDMA_CHAN_UART1_TX,
+    .txBufPtr           = NULL,
+    .txBufSize          = 0,
+    .txPinMux           = IOC_PORT_MCU_UART0_TX,
+    .rxPinMux           = IOC_PORT_MCU_UART0_RX,
+    .ctsPinMux          = IOC_PORT_MCU_UART0_CTS,
+    .rtsPinMux          = IOC_PORT_MCU_UART0_RTS,
+    .dmaTxTableEntryPri = &dmaUart0TxControlTableEntry,
+    .dmaRxTableEntryPri = &dmaUart0RxControlTableEntry,
+    .rxChannelMask      = 1 << UDMA_CHAN_UART0_RX,
+    .txChannelMask      = 1 << UDMA_CHAN_UART0_TX,
     .txIntFifoThr       = UART2CC26X2_FIFO_THRESHOLD_1_8,
     .rxIntFifoThr       = UART2CC26X2_FIFO_THRESHOLD_4_8
   },
@@ -261,6 +224,14 @@ const UART2_Config UART2_config[CONFIG_UART2_COUNT] = {
 const uint_least8_t CONFIG_UART2_0_CONST = CONFIG_UART2_0;
 const uint_least8_t UART2_count = CONFIG_UART2_COUNT;
 
+/* Forward-declare write function used for blocking and callback mode */
+extern int_fast16_t UART2_writeTimeoutBlocking(UART2_Handle handle, const void *buffer, size_t size, size_t *bytesWritten, uint32_t timeout);
+
+/* Override weak writeTimeout function in UART2 library to only use blocking/callback mode */
+int_fast16_t UART2_writeTimeout(UART2_Handle handle, const void *buffer, size_t size, size_t *bytesWritten, uint32_t timeout)
+{
+    return UART2_writeTimeoutBlocking(handle, buffer, size, bytesWritten, timeout);
+}
 
 #include <stdbool.h>
 
