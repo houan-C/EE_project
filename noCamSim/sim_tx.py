@@ -26,7 +26,8 @@ except ImportError:
 
 DRAW_BBOXES = False # Let user decide if human bounding boxes should be drawn on TX side
 
-com_port = get_role_port("TX")
+com_port = "COM6"
+# com_port = get_role_port("TX")
 
 if com_port is None:
     print("Error: No available COM port found. Please check your connection.")

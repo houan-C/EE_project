@@ -13,20 +13,13 @@ def get_xds110_ports():
     for p in ports:
         # VID 0x0451 is Texas Instruments (XDS110)
         if p.vid == 0x0451:
-            xds_ports.append(p)
-            
-    serial_to_port = {}
-    for p in xds_ports:
-        sn = p.serial_number or "unknown"
-        if sn not in serial_to_port:
-            serial_to_port[sn] = p
-        else:
-            port1_num = int(''.join(filter(str.isdigit, serial_to_port[sn].device)))
-            port2_num = int(''.join(filter(str.isdigit, p.device)))
-            if port2_num < port1_num:
-                serial_to_port[sn] = p
+            loc = p.location or ""
+            hwid = p.hwid or ""
+            # Only keep the Application/User UART interface (interface 0 / MI_00 / ends with 0)
+            if "MI_00" in hwid or loc.endswith("0") or "x.0" in loc:
+                xds_ports.append(p)
                 
-    return list(serial_to_port.values())
+    return xds_ports
 
 def test_tx_rx(portA, portB):
     try:

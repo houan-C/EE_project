@@ -52,7 +52,7 @@ def main():
     print("Initializing Reed-Solomon Decoder (nsym=32)...")
     rs = RSCodec(32)
 
-    rs_block_size = 200
+    rs_block_size = 255
 
     # Statistics counters
     start_seq_no = None
@@ -89,53 +89,21 @@ def main():
                 chunk_buffer.extend(data)
 
             if args.raw:
-                # Direct raw streaming (200-byte blocks)
+                # Direct raw streaming
                 stream_buffer.extend(chunk_buffer)
                 chunk_buffer.clear()
-                while len(stream_buffer) >= rs_block_size:
-                    rs_block = stream_buffer[:rs_block_size]
-                    stream_buffer = stream_buffer[rs_block_size:]
-                    stat_received += 1
-                    
-                    # Process RS Block
-                    try:
-                        decoded_tuple = rs.decode(rs_block)
-                        decoded_msg = decoded_tuple[0]
-                        seq_no = struct.unpack(">I", decoded_msg[:4])[0]
-                        corrected_block = rs.encode(decoded_msg)
-                        diff_positions = [i for i in range(rs_block_size) if rs_block[i] != corrected_block[i]]
-                        num_errors = len(diff_positions)
-                        if num_errors == 0:
-                            stat_clean += 1
-                            error_distribution[0] += 1
-                        else:
-                            stat_corrected += 1
-                            error_distribution[num_errors] += 1
-                        if start_seq_no is None:
-                            start_seq_no = seq_no
-                            last_seq_no = seq_no
-                        else:
-                            if seq_no > last_seq_no + 1:
-                                stat_lost += (seq_no - last_seq_no - 1)
-                            last_seq_no = seq_no
-                    except ReedSolomonError:
-                        stat_uncorrectable += 1
-                        error_distribution['>16'] += 1
-                        if last_seq_no is not None:
-                            last_seq_no += 1
             else:
-                # Parse DSSS MAC Frame format: [Len(1, always 200) | Payload(200) | RSSI(1) | Status(1)] = 203 bytes
+                # Parse DSSS MAC Frame format: [Len(1B) | Payload(Len) | RSSI(1B) | Status(1B)]
                 while len(chunk_buffer) >= 3:
                     payload_len = chunk_buffer[0]
-                    if payload_len != 200:
-                        # Corrupted or shifted framing byte, discard and scan
+                    if payload_len > 255 or payload_len == 0:
                         chunk_buffer.pop(0)
                         continue
 
                     if len(chunk_buffer) < payload_len + 3:
                         break
                     
-                    # Verify dummy/status byte at the end of the frame is 0x00
+                    # Verify status/dummy byte is 0x00
                     if chunk_buffer[payload_len + 2] != 0x00:
                         chunk_buffer.pop(0)
                         continue
@@ -143,42 +111,63 @@ def main():
                     rssi_val = chunk_buffer[payload_len + 1] - 256
                     rssi_list.append(rssi_val)
                     
-                    rs_block = chunk_buffer[1 : payload_len + 1]
+                    payload = chunk_buffer[1 : payload_len + 1]
+                    stream_buffer.extend(payload)
                     chunk_buffer = chunk_buffer[payload_len + 3 :]
 
-                    stat_received += 1
+            # Parse stream_buffer using magic header
+            RS_MAGIC = b'RSTST'
+            PACKET_SIZE = 260  # 5B magic + 255B RS block
 
-                    # Process RS Block
-                    try:
-                        decoded_tuple = rs.decode(rs_block)
-                        decoded_msg = decoded_tuple[0]
-                        seq_no = struct.unpack(">I", decoded_msg[:4])[0]
-                        
-                        corrected_block = rs.encode(decoded_msg)
-                        diff_positions = [i for i in range(rs_block_size) if rs_block[i] != corrected_block[i]]
-                        num_errors = len(diff_positions)
-                        
-                        if num_errors == 0:
-                            stat_clean += 1
-                            error_distribution[0] += 1
-                        else:
-                            stat_corrected += 1
-                            error_distribution[num_errors] += 1
+            while True:
+                magic_pos = stream_buffer.find(RS_MAGIC)
+                if magic_pos == -1:
+                    if len(stream_buffer) > PACKET_SIZE:
+                        stream_buffer = stream_buffer[-(PACKET_SIZE - 1):]
+                    break
 
-                        if start_seq_no is None:
-                            start_seq_no = seq_no
-                            last_seq_no = seq_no
-                        else:
-                            if seq_no > last_seq_no + 1:
-                                gaps = seq_no - last_seq_no - 1
-                                stat_lost += gaps
-                            last_seq_no = seq_no
-                            
-                    except ReedSolomonError:
-                        stat_uncorrectable += 1
-                        error_distribution['>16'] += 1
-                        if last_seq_no is not None:
-                            last_seq_no += 1
+                if magic_pos > 0:
+                    stream_buffer = stream_buffer[magic_pos:]
+
+                if len(stream_buffer) < PACKET_SIZE:
+                    break
+
+                rs_block = bytes(stream_buffer[5:260])
+                stream_buffer = stream_buffer[PACKET_SIZE:]
+
+                stat_received += 1
+
+                # Process RS Block
+                try:
+                    decoded_tuple = rs.decode(rs_block)
+                    decoded_msg = decoded_tuple[0]
+                    seq_no = struct.unpack(">I", decoded_msg[:4])[0]
+                    
+                    corrected_block = rs.encode(decoded_msg)
+                    diff_positions = [i for i in range(rs_block_size) if rs_block[i] != corrected_block[i]]
+                    num_errors = len(diff_positions)
+                    
+                    if num_errors == 0:
+                        stat_clean += 1
+                        error_distribution[0] += 1
+                    else:
+                        stat_corrected += 1
+                        error_distribution[num_errors] += 1
+
+                    if start_seq_no is None:
+                        start_seq_no = seq_no
+                        last_seq_no = seq_no
+                    else:
+                        if seq_no > last_seq_no + 1:
+                            gaps = seq_no - last_seq_no - 1
+                            stat_lost += gaps
+                        last_seq_no = seq_no
+                        
+                except ReedSolomonError:
+                    stat_uncorrectable += 1
+                    error_distribution['>16'] += 1
+                    if last_seq_no is not None:
+                        last_seq_no += 1
 
             # Update display dashboard every 1.0 second
             now = time.time()

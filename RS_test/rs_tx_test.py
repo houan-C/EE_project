@@ -51,10 +51,12 @@ def main():
     ser.reset_input_buffer()
     ser.reset_output_buffer()
 
-    print("Initializing Reed-Solomon Encoder (nsym=32)...")
-    rs = RSCodec(32)
+    RS_MAGIC = b'RSTST'
+    RS_ECC_BYTES = 32
+    RS_DATA_BYTES = 255 - RS_ECC_BYTES  # 223
+    rsc = RSCodec(RS_ECC_BYTES)
 
-    # For 200-byte total block size with nsym=32, data payload must be 168 bytes
+    # For 255-byte RS block, the message payload must be 223 bytes (4 bytes SeqNo + 219 bytes dummy data)
     seq_no = 0
     total_packets = args.count
 
@@ -68,15 +70,18 @@ def main():
                 print(f"Finished sending {total_packets} packets.")
                 break
 
-            # Message structure: [SeqNo (4 bytes) | Payload (164 bytes)] = 168 bytes
-            payload = bytes(i % 256 for i in range(164))
+            # Message structure: [SeqNo (4 bytes) | Payload (219 bytes)] = 223 bytes
+            payload = bytes(i % 256 for i in range(219))
             message = struct.pack(">I", seq_no) + payload
 
-            # RS Encode to exactly 200 bytes (168 bytes data + 32 bytes parity)
-            rs_block = rs.encode(message)
+            # RS Encode to exactly 255 bytes
+            rs_block = rsc.encode(message)
 
-            # Transmit exactly 200 bytes to match CC1310 PAYLOAD_LENGTH
-            ser.write(rs_block)
+            # Prepend magic to form a 260-byte packet
+            packet = RS_MAGIC + rs_block
+
+            # Transmit 260-byte packet over serial
+            ser.write(packet)
             ser.flush()
 
             if seq_no % 100 == 0:

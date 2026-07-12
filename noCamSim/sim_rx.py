@@ -27,7 +27,8 @@ except ImportError:
 # ====================================================================
 # === USER SETTINGS ===
 # ====================================================================
-COM_PORT = get_role_port("RX")
+COM_PORT = "COM3"
+# COM_PORT = get_role_port("RX")
 BAUD_RATE = 921600
 CHUNK_SIZE = 1024
 TIMEOUT = 0.01
