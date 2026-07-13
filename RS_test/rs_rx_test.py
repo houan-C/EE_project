@@ -69,6 +69,68 @@ def main():
     error_distribution = {i: 0 for i in range(17)}
     error_distribution['>16'] = 0
 
+    def print_and_reset_report(title):
+        nonlocal start_seq_no, last_seq_no, stat_received, stat_lost, stat_clean
+        nonlocal stat_corrected, stat_uncorrectable, stat_raw_bytes, rssi_list, error_distribution
+
+        if stat_received == 0:
+            return
+
+        total_sent = (last_seq_no - start_seq_no + 1) if start_seq_no is not None else 0
+        total_sent = max(total_sent, stat_received + stat_lost)
+        loss_rate = (stat_lost / total_sent * 100) if total_sent > 0 else 0
+        corr_rate = (stat_corrected / stat_received * 100) if stat_received > 0 else 0
+        uncorr_rate = (stat_uncorrectable / stat_received * 100) if stat_received > 0 else 0
+        avg_rssi = np.mean(rssi_list) if rssi_list else 0.0
+
+        print("\n" + "=" * 50)
+        print(f"{title:^50}")
+        print("=" * 50)
+        print(f"COM Port:            {com_port}")
+        print(f"Baud Rate:           {args.baud}")
+        print(f"Raw Bytes Recv'd:    {stat_raw_bytes} bytes")
+        print(f"Estimated Sent:      {total_sent} packets")
+        print(f"Packets Lost:        {stat_lost} packets ({loss_rate:.2f}% packet loss)")
+        print(f"Packets Received:    {stat_received} packets")
+        print(f"  - Clean:           {stat_clean} packets")
+        print(f"  - Corrected:       {stat_corrected} packets ({corr_rate:.2f}%)")
+        print(f"  - Uncorrectable:   {stat_uncorrectable} packets ({uncorr_rate:.2f}%)")
+        print(f"Average Link RSSI:   {avg_rssi:.1f} dBm")
+        print("-" * 50)
+        print("Error Distribution Table:")
+        print("  Errors (bytes) | Packet Count | Percentage")
+        for err_cnt in sorted([k for k in error_distribution.keys() if isinstance(k, int)]) + ['>16']:
+            cnt = error_distribution[err_cnt]
+            pct = (cnt / stat_received * 100) if stat_received > 0 else 0
+            print(f"    {str(err_cnt):<12s} | {cnt:<12d} | {pct:.2f}%")
+        print("=" * 50)
+        print("Scientific Analysis Conclusions:")
+        if loss_rate > 5.0 and stat_corrected == 0:
+            print("  [Erase-Only Channel]: Bit/byte corruption is extremely rare.")
+            print("  The hardware CRC layer automatically drops packets with errors,")
+            print("  causing chunk-based erasures. Standard byte-level RS(255, 223) within")
+            print("  packets is INEFFECTIVE here. Recommend switching to Packet-Level")
+            print("  Erasure Coding across multiple packets.")
+        elif stat_corrected > 0:
+            print("  [Hybrid Channel]: Both random byte corruption and packet drops are present.")
+            print(f"  Byte-level RS successfully repaired {stat_corrected} packets ({corr_rate:.2f}%).")
+            print("  Byte-level RS is effective at improving link reliability.")
+        else:
+            print("  Link was clean during this run. No errors or drops detected.")
+        print("=" * 50 + "\n")
+
+        # Reset for next window
+        start_seq_no = None
+        stat_received = 0
+        stat_lost = 0
+        stat_clean = 0
+        stat_corrected = 0
+        stat_uncorrectable = 0
+        stat_raw_bytes = 0
+        rssi_list.clear()
+        for k in error_distribution:
+            error_distribution[k] = 0
+
     chunk_buffer = bytearray()
     stream_buffer = bytearray()
 
@@ -169,6 +231,11 @@ def main():
                     if last_seq_no is not None:
                         last_seq_no += 1
 
+                if stat_received == 2000:
+                    print("\n\n" + "*" * 50)
+                    print_and_reset_report("2000 PACKETS INTERVAL REPORT")
+                    time.sleep(2.0) # Pause so dashboard does not immediately wipe it
+
             # Update display dashboard every 1.0 second
             now = time.time()
             if now - last_display_time >= 1.0:
@@ -217,49 +284,7 @@ def main():
     finally:
         ser.close()
         
-        # Print final report summary
-        total_sent = (last_seq_no - start_seq_no + 1) if start_seq_no is not None else 0
-        total_sent = max(total_sent, stat_received + stat_lost)
-        loss_rate = (stat_lost / total_sent * 100) if total_sent > 0 else 0
-        corr_rate = (stat_corrected / stat_received * 100) if stat_received > 0 else 0
-        uncorr_rate = (stat_uncorrectable / stat_received * 100) if stat_received > 0 else 0
-        avg_rssi = np.mean(rssi_list) if rssi_list else 0.0
-
-        print("\n" + "=" * 50)
-        print("                 FINAL EXPERIMENT REPORT          ")
-        print("=" * 50)
-        print(f"COM Port:            {com_port}")
-        print(f"Baud Rate:           {args.baud}")
-        print(f"Raw Bytes Recv'd:    {stat_raw_bytes} bytes")
-        print(f"Estimated Sent:      {total_sent} packets")
-        print(f"Packets Lost:        {stat_lost} packets ({loss_rate:.2f}% packet loss)")
-        print(f"Packets Received:    {stat_received} packets")
-        print(f"  - Clean:           {stat_clean} packets")
-        print(f"  - Corrected:       {stat_corrected} packets ({corr_rate:.2f}%)")
-        print(f"  - Uncorrectable:   {stat_uncorrectable} packets ({uncorr_rate:.2f}%)")
-        print(f"Average Link RSSI:   {avg_rssi:.1f} dBm")
-        print("-" * 50)
-        print("Error Distribution Table:")
-        print("  Errors (bytes) | Packet Count | Percentage")
-        for err_cnt in sorted([k for k in error_distribution.keys() if isinstance(k, int)]) + ['>16']:
-            cnt = error_distribution[err_cnt]
-            pct = (cnt / stat_received * 100) if stat_received > 0 else 0
-            print(f"    {str(err_cnt):<12s} | {cnt:<12d} | {pct:.2f}%")
-        print("=" * 50)
-        print("Scientific Analysis Conclusions:")
-        if loss_rate > 5.0 and stat_corrected == 0:
-            print("  [Erase-Only Channel]: Bit/byte corruption is extremely rare.")
-            print("  The hardware CRC layer automatically drops packets with errors,")
-            print("  causing chunk-based erasures. Standard byte-level RS(255, 223) within")
-            print("  packets is INEFFECTIVE here. Recommend switching to Packet-Level")
-            print("  Erasure Coding across multiple packets.")
-        elif stat_corrected > 0:
-            print("  [Hybrid Channel]: Both random byte corruption and packet drops are present.")
-            print(f"  Byte-level RS successfully repaired {stat_corrected} packets ({corr_rate:.2f}%).")
-            print("  Byte-level RS is effective at improving link reliability.")
-        else:
-            print("  Link was clean during this run. No errors or drops detected.")
-        print("=" * 50 + "\n")
+        print_and_reset_report("FINAL EXPERIMENT REPORT")
 
 if __name__ == "__main__":
     main()

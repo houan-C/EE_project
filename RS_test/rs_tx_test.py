@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--port", type=str, default=None, help="COM port (default: auto-discover)")
     parser.add_argument("--baud", type=int, default=921600, help="Baud rate (default: 921600)")
     parser.add_argument("--interval", type=float, default=0.02, help="Transmit interval in seconds (default: 0.02)")
-    parser.add_argument("--count", type=int, default=2000, help="Total packets to send, 0 for infinite (default: 2000)")
+    parser.add_argument("--count", type=int, default=0, help="Total packets to send, 0 for infinite (default: 0)")
     args = parser.parse_args()
 
     com_port = args.port if args.port else find_serial_port()

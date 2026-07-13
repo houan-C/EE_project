@@ -6,9 +6,11 @@ import numpy as np
 from PIL import Image
 import io
 import sys
+import os
 import struct
 import threading
 import queue
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # Try to import pillow_avif to register the AVIF plugin. 
 try:
@@ -33,6 +35,13 @@ print(f"Found COM port: {com_port}")
 
 baud_rate = 921600
 timeout = 1
+
+# ============================================================
+# AES-GCM 加密設定 (必須與 RX 端完全一致)
+# ============================================================
+AES_KEY      = b'this_is_a_32_byte_secret_key_!!!'
+aes_gcm      = AESGCM(AES_KEY)
+MAGIC_HEADER = b'FRIEREN'
 
 try:
     ser = serial.Serial(com_port, baud_rate, timeout=timeout)
@@ -188,7 +197,7 @@ def detect_sky_mask(frame_bgr, new_h, new_w):
     
     return sky_mask
 
-# ====== Thread 3: Zero-Latency Serial Writer ======
+# ====== Thread 3: Zero-Latency Serial Writer (AES-GCM 加密) ======
 def serial_writer_thread(serial_port, c_size):
     global latest_payload_state
     while running:
@@ -200,8 +209,12 @@ def serial_writer_thread(serial_port, c_size):
 
         if state is not None:
             sent_queue.put(state)
-            for i in range(0, len(state.payload), c_size):
-                chunk = state.payload[i:i + c_size]
+            # AES-GCM 加密：每個封包產生唯一 nonce，加密 payload
+            nonce      = os.urandom(12)
+            ciphertext = aes_gcm.encrypt(nonce, state.payload, None)
+            encrypted_packet = MAGIC_HEADER + nonce + ciphertext
+            for i in range(0, len(encrypted_packet), c_size):
+                chunk = encrypted_packet[i:i + c_size]
                 serial_port.write(chunk)
                 time.sleep(0.03)
         else:

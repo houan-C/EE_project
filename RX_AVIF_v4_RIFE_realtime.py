@@ -8,6 +8,7 @@ import queue
 import io
 import collections
 import struct
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # --- Pillow for AVIF Support ---
 try:
@@ -29,10 +30,17 @@ except ImportError:
 # ====================================================================
 # === USER SETTINGS ===
 # ====================================================================
-COM_PORT   = "COM5"
+COM_PORT   = "COM3"
 BAUD_RATE  = 921600
 CHUNK_SIZE = 1024
 TIMEOUT    = 0.01
+
+# ====================================================================
+# === AES-GCM 加密設定 (必須與 TX 端完全一致) ===
+# ====================================================================
+AES_KEY      = b'this_is_a_32_byte_secret_key_!!!'
+aes_gcm      = AESGCM(AES_KEY)
+MAGIC_HEADER = b'FRIEREN'
 
 # Target display size
 TARGET_W, TARGET_H = 1280, 960
@@ -235,7 +243,7 @@ def on_mouse(event, x, y, flags, param):
 # (Grid & Blending logic removed - using simplified BBox + JPEG protocol)
 
 # ====================================================================
-# === THREAD 1: Serial Reader (Simplified BBox + JPEG Protocol) ===
+# === THREAD 1: Serial Reader (AES-GCM 解密 + BBox + AVIF Protocol) ===
 # ====================================================================
 def serial_reader_thread():
     global running, right_count, wrong_count
@@ -278,31 +286,56 @@ def serial_reader_thread():
                 buffer.extend(chunk[1: payloadLen + 1])
                 chunk = chunk[payloadLen + 3:]
 
-            # --- Protocol Decode ---
+            # --- AES-GCM 解密層：用 MAGIC_HEADER 定界，解密取得原始 AVIF payload ---
+            decrypted_buf = bytearray()
             while True:
-                idx = buffer.find(header_magic)
-                if idx == -1:
-                    if len(buffer) > 3:
-                        buffer = buffer[-3:]
-                    break
-                if idx > 0:
-                    buffer = buffer[idx:]
-                    idx = 0
-                if len(buffer) < header_size:
+                start_idx = buffer.find(MAGIC_HEADER)
+                if start_idx == -1:
+                    if len(buffer) > 2048:
+                        buffer = buffer[-512:]
                     break
 
-                unpacked = struct.unpack(header_format, buffer[:header_size])
-                magic, pkt_type, dx, dy, crop_x, crop_y, payload_len = unpacked
+                next_idx = buffer.find(MAGIC_HEADER, start_idx + len(MAGIC_HEADER))
+                if next_idx == -1:
+                    break
 
-                if payload_len > 2_000_000:
-                    buffer = buffer[4:]
+                encrypted_packet = buffer[start_idx + len(MAGIC_HEADER) : next_idx]
+                buffer = buffer[next_idx:]
+
+                try:
+                    nonce      = bytes(encrypted_packet[:12])
+                    ciphertext = bytes(encrypted_packet[12:])
+                    plain_data = aes_gcm.decrypt(nonce, ciphertext, None)
+                    decrypted_buf.extend(plain_data)
+                    right_count += 1
+                except Exception:
                     wrong_count += 1
                     continue
 
-                if len(buffer) < header_size + payload_len:
+            # --- Protocol Decode (AVIF header 解析，輸入為解密後的明文) ---
+            avif_buf = decrypted_buf
+            while True:
+                idx = avif_buf.find(header_magic)
+                if idx == -1:
+                    break
+                if idx > 0:
+                    avif_buf = avif_buf[idx:]
+                    idx = 0
+                if len(avif_buf) < header_size:
                     break
 
-                frame_data = buffer[header_size: header_size + payload_len]
+                unpacked = struct.unpack(header_format, avif_buf[:header_size])
+                magic, pkt_type, dx, dy, crop_x, crop_y, payload_len = unpacked
+
+                if payload_len > 2_000_000:
+                    avif_buf = avif_buf[4:]
+                    wrong_count += 1
+                    continue
+
+                if len(avif_buf) < header_size + payload_len:
+                    break
+
+                frame_data = avif_buf[header_size: header_size + payload_len]
 
                 try:
                     img = Image.open(io.BytesIO(frame_data))
@@ -316,7 +349,7 @@ def serial_reader_thread():
                     elif pkt_type == 1:
                         # Partial Frame (JPEG) — apply GMC then paste patch
                         if current_bg is None:
-                            buffer = buffer[header_size + payload_len:]
+                            avif_buf = avif_buf[header_size + payload_len:]
                             continue
 
                         h_bg, w_bg = current_bg.shape[:2]
@@ -386,20 +419,19 @@ def serial_reader_thread():
 
                     else:
                         wrong_count += 1
-                        buffer = buffer[header_size + payload_len:]
+                        avif_buf = avif_buf[header_size + payload_len:]
                         continue
 
                     # Resize to TRT resolution and push to RIFE queue
                     bgr_resized = cv2.resize(current_bg, (SRC_W, SRC_H))
-                    right_count += 1
                     if not rife_input_q.full():
                         rife_input_q.put((bgr_resized, rssi))
 
-                    buffer = buffer[header_size + payload_len:]
+                    avif_buf = avif_buf[header_size + payload_len:]
 
                 except Exception:
                     wrong_count += 1
-                    buffer = buffer[4:]  # Resync
+                    avif_buf = avif_buf[4:]  # Resync
 
         except Exception:
             time.sleep(0.05)
