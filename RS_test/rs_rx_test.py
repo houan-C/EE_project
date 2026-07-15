@@ -6,6 +6,11 @@ import sys
 import argparse
 from reedsolo import RSCodec, ReedSolomonError
 import numpy as np
+import os
+
+# Enable ANSI escape sequences on Windows CMD/PowerShell
+if os.name == 'nt':
+    os.system('')
 
 def find_serial_port():
     ports = list(serial.tools.list_ports.comports())
@@ -24,6 +29,9 @@ def main():
     parser.add_argument("--port", type=str, default=None, help="COM port (default: auto-discover)")
     parser.add_argument("--baud", type=int, default=921600, help="Baud rate (default: 921600)")
     parser.add_argument("--raw", action="store_true", help="Use raw UART mode (disable CC1310 DSSS MAC parsing)")
+    parser.add_argument("--interval", type=float, default=0.02, help="Expected packet interval in seconds (default: 0.02)")
+    parser.add_argument("--test-len", type=int, default=2000, help="Number of packets for test run (default: 2000)")
+    parser.add_argument("--sync-len", type=int, default=100, help="Consecutive packets to establish stable connection (default: 100)")
     args = parser.parse_args()
 
     com_port = args.port if args.port else find_serial_port()
@@ -69,11 +77,18 @@ def main():
     error_distribution = {i: 0 for i in range(17)}
     error_distribution['>16'] = 0
 
+    # Connection state machine variables
+    connection_stable = False
+    consecutive_count = 0
+    timeout_lost_seqs = set()
+    last_packet_time = None
+
     def print_and_reset_report(title):
         nonlocal start_seq_no, last_seq_no, stat_received, stat_lost, stat_clean
         nonlocal stat_corrected, stat_uncorrectable, stat_raw_bytes, rssi_list, error_distribution
+        nonlocal connection_stable, consecutive_count, timeout_lost_seqs, last_packet_time
 
-        if stat_received == 0:
+        if stat_received == 0 and stat_lost == 0:
             return
 
         total_sent = (last_seq_no - start_seq_no + 1) if start_seq_no is not None else 0
@@ -121,6 +136,7 @@ def main():
 
         # Reset for next window
         start_seq_no = None
+        last_seq_no = None
         stat_received = 0
         stat_lost = 0
         stat_clean = 0
@@ -130,6 +146,10 @@ def main():
         rssi_list.clear()
         for k in error_distribution:
             error_distribution[k] = 0
+        timeout_lost_seqs.clear()
+        connection_stable = False
+        consecutive_count = 0
+        last_packet_time = None
 
     chunk_buffer = bytearray()
     stream_buffer = bytearray()
@@ -181,6 +201,23 @@ def main():
             RS_MAGIC = b'RSTST'
             PACKET_SIZE = 260  # 5B magic + 255B RS block
 
+            # Helper to record statistics when stable
+            def record_packet_stats(is_dec, raw_blk, dec_msg):
+                nonlocal stat_clean, stat_corrected, stat_uncorrectable, error_distribution
+                if is_dec:
+                    corrected_block = rs.encode(dec_msg)
+                    diff_positions = [i for i in range(rs_block_size) if raw_blk[i] != corrected_block[i]]
+                    num_errors = len(diff_positions)
+                    if num_errors == 0:
+                        stat_clean += 1
+                        error_distribution[0] += 1
+                    else:
+                        stat_corrected += 1
+                        error_distribution[num_errors] += 1
+                else:
+                    stat_uncorrectable += 1
+                    error_distribution['>16'] += 1
+
             while True:
                 magic_pos = stream_buffer.find(RS_MAGIC)
                 if magic_pos == -1:
@@ -197,86 +234,149 @@ def main():
                 rs_block = bytes(stream_buffer[5:260])
                 stream_buffer = stream_buffer[PACKET_SIZE:]
 
-                stat_received += 1
-
-                # Process RS Block
+                # Try decoding to extract seq_no
                 try:
                     decoded_tuple = rs.decode(rs_block)
                     decoded_msg = decoded_tuple[0]
                     seq_no = struct.unpack(">I", decoded_msg[:4])[0]
-                    
-                    corrected_block = rs.encode(decoded_msg)
-                    diff_positions = [i for i in range(rs_block_size) if rs_block[i] != corrected_block[i]]
-                    num_errors = len(diff_positions)
-                    
-                    if num_errors == 0:
-                        stat_clean += 1
-                        error_distribution[0] += 1
-                    else:
-                        stat_corrected += 1
-                        error_distribution[num_errors] += 1
+                    is_decoded = True
+                except ReedSolomonError:
+                    seq_no = struct.unpack(">I", rs_block[:4])[0]
+                    decoded_msg = None
+                    is_decoded = False
 
-                    if start_seq_no is None:
+                if not connection_stable:
+                    # Sync phase
+                    if last_seq_no is None:
+                        consecutive_count = 1
+                        last_seq_no = seq_no
+                    else:
+                        if seq_no == last_seq_no + 1:
+                            consecutive_count += 1
+                        else:
+                            consecutive_count = 1
+                        last_seq_no = seq_no
+                    
+                    last_packet_time = time.time()
+                    
+                    if consecutive_count >= args.sync_len:
+                        connection_stable = True
                         start_seq_no = seq_no
                         last_seq_no = seq_no
+                        stat_received = 1
+                        stat_lost = 0
+                        stat_clean = 0
+                        stat_corrected = 0
+                        stat_uncorrectable = 0
+                        rssi_list = rssi_list[-1:] if rssi_list else []
+                        for k in error_distribution:
+                            error_distribution[k] = 0
+                        timeout_lost_seqs.clear()
+                        record_packet_stats(is_decoded, rs_block, decoded_msg)
+                else:
+                    # Stable phase
+                    now = time.time()
+                    if seq_no <= last_seq_no:
+                        if seq_no in timeout_lost_seqs:
+                            timeout_lost_seqs.remove(seq_no)
+                            stat_lost -= 1
+                            stat_uncorrectable -= 1
+                            error_distribution['>16'] -= 1
+                            stat_received += 1
+                            record_packet_stats(is_decoded, rs_block, decoded_msg)
                     else:
+                        stat_received += 1
+                        # Check for sequence gaps
                         if seq_no > last_seq_no + 1:
-                            gaps = seq_no - last_seq_no - 1
-                            stat_lost += gaps
+                            for g_seq in range(last_seq_no + 1, seq_no):
+                                if g_seq not in timeout_lost_seqs:
+                                    stat_lost += 1
+                                    stat_uncorrectable += 1
+                                    error_distribution['>16'] += 1
+                        record_packet_stats(is_decoded, rs_block, decoded_msg)
                         last_seq_no = seq_no
-                        
-                except ReedSolomonError:
-                    stat_uncorrectable += 1
-                    error_distribution['>16'] += 1
-                    if last_seq_no is not None:
-                        last_seq_no += 1
+                        last_packet_time = now
 
-                if stat_received == 2000:
+            # Timeout check at the end of loop iteration
+            now = time.time()
+            if last_packet_time is not None:
+                if connection_stable:
+                    elapsed = now - last_packet_time
+                    while elapsed >= 1.8 * args.interval:
+                        lost_seq = last_seq_no + 1
+                        stat_lost += 1
+                        stat_uncorrectable += 1
+                        error_distribution['>16'] += 1
+                        timeout_lost_seqs.add(lost_seq)
+                        
+                        last_seq_no = lost_seq
+                        last_packet_time += args.interval
+                        elapsed = now - last_packet_time
+                else:
+                    # Reset consecutive sync packets if no packets received for 1.8 * interval
+                    if now - last_packet_time >= 1.8 * args.interval:
+                        consecutive_count = 0
+                        last_packet_time = now
+
+            # Check if test run is completed
+            if connection_stable and start_seq_no is not None:
+                total_sent = (last_seq_no - start_seq_no + 1)
+                total_sent = max(total_sent, stat_received + stat_lost)
+                if total_sent >= args.test_len:
                     print("\n\n" + "*" * 50)
-                    print_and_reset_report("2000 PACKETS INTERVAL REPORT")
-                    time.sleep(2.0) # Pause so dashboard does not immediately wipe it
+                    print_and_reset_report(f"{args.test_len} PACKETS COMPLETED REPORT")
+                    time.sleep(2.0)
 
             # Update display dashboard every 1.0 second
             now = time.time()
             if now - last_display_time >= 1.0:
                 last_display_time = now
                 
-                # Calculations
-                total_sent = (last_seq_no - start_seq_no + 1) if start_seq_no is not None else 0
-                total_sent = max(total_sent, stat_received + stat_lost)
-                
-                loss_rate = (stat_lost / total_sent * 100) if total_sent > 0 else 0
-                corr_rate = (stat_corrected / stat_received * 100) if stat_received > 0 else 0
-                uncorr_rate = (stat_uncorrectable / stat_received * 100) if stat_received > 0 else 0
-                avg_rssi = np.mean(rssi_list[-50:]) if rssi_list else 0.0
-
                 # Print Dashboard
                 sys.stdout.write("\033[H\033[J")  # Clear screen
                 sys.stdout.write("==================================================\n")
                 sys.stdout.write("        Reed-Solomon Hardware Test Dashboard      \n")
                 sys.stdout.write("==================================================\n")
                 sys.stdout.write(f"Port: {com_port} | Baud: {args.baud}\n")
-                sys.stdout.write(f"Telemetry Status: {'Active' if last_seq_no is not None else 'Waiting for data...'}\n")
-                if last_seq_no is not None:
-                    sys.stdout.write(f"Seq Range: #{start_seq_no} to #{last_seq_no}\n")
-                sys.stdout.write(f"Avg RSSI (Last 50): {avg_rssi:.1f} dBm\n")
-                sys.stdout.write(f"Raw Bytes Recv'd:    {stat_raw_bytes} bytes\n")
-                sys.stdout.write("--------------------------------------------------\n")
-                sys.stdout.write(f"Estimated Sent:      {total_sent:<6d}\n")
-                sys.stdout.write(f"Packets Lost:        {stat_lost:<6d} (Loss Rate: {loss_rate:.2f}%)\n")
-                sys.stdout.write(f"Packets Received:    {stat_received:<6d}\n")
-                sys.stdout.write(f"  - Clean (0 errors):{stat_clean:<6d}\n")
-                sys.stdout.write(f"  - Corrected (1-16):{stat_corrected:<6d} (Corr Rate: {corr_rate:.2f}%)\n")
-                sys.stdout.write(f"  - Uncorrectable:   {stat_uncorrectable:<6d} (Uncorr Rate: {uncorr_rate:.2f}%)\n")
-                sys.stdout.write("--------------------------------------------------\n")
-                sys.stdout.write("Error distribution in received blocks (0-16 bytes):\n")
                 
-                # Print histogram inline
-                for err_cnt in [0, 1, 2, 3, 4, 8, 12, 16, '>16']:
-                    count = error_distribution[err_cnt]
-                    bar = "#" * min(20, int(count / max(1, stat_received) * 40))
-                    sys.stdout.write(f"  {str(err_cnt):>3s} bytes error: {count:<5d} {bar}\n")
-                sys.stdout.write("==================================================\n")
+                if not connection_stable:
+                    # Show RED indicator and synchronization progress
+                    sys.stdout.write(f"Connection Status: \033[91m[UNSTABLE / DISCONNECTED]\033[0m\n")
+                    sys.stdout.write(f"Sync Progress:     {consecutive_count} / {args.sync_len} consecutive packets\n")
+                    sys.stdout.write("==================================================\n")
+                else:
+                    # Calculations for Stable state
+                    total_sent = (last_seq_no - start_seq_no + 1) if start_seq_no is not None else 0
+                    total_sent = max(total_sent, stat_received + stat_lost)
+                    loss_rate = (stat_lost / total_sent * 100) if total_sent > 0 else 0
+                    corr_rate = (stat_corrected / stat_received * 100) if stat_received > 0 else 0
+                    uncorr_rate = (stat_uncorrectable / stat_received * 100) if stat_received > 0 else 0
+                    avg_rssi = np.mean(rssi_list[-50:]) if rssi_list else 0.0
+                    progress_pct = (total_sent / args.test_len * 100) if args.test_len > 0 else 0.0
+
+                    # Show GREEN indicator and test metrics
+                    sys.stdout.write(f"Connection Status: \033[92m[STABLE CONNECTED]\033[0m\n")
+                    sys.stdout.write(f"Test Progress:     {total_sent} / {args.test_len} packets ({progress_pct:.1f}%)\n")
+                    sys.stdout.write(f"Telemetry Status:  Active\n")
+                    sys.stdout.write(f"Seq Range:         #{start_seq_no} to #{last_seq_no}\n")
+                    sys.stdout.write(f"Avg RSSI (Last 50): {avg_rssi:.1f} dBm\n")
+                    sys.stdout.write(f"Raw Bytes Recv'd:    {stat_raw_bytes} bytes\n")
+                    sys.stdout.write("--------------------------------------------------\n")
+                    sys.stdout.write(f"Estimated Sent:      {total_sent:<6d}\n")
+                    sys.stdout.write(f"Packets Lost:        {stat_lost:<6d} (Loss Rate: {loss_rate:.2f}%)\n")
+                    sys.stdout.write(f"Packets Received:    {stat_received:<6d}\n")
+                    sys.stdout.write(f"  - Clean (0 errors):{stat_clean:<6d}\n")
+                    sys.stdout.write(f"  - Corrected (1-16):{stat_corrected:<6d} (Corr Rate: {corr_rate:.2f}%)\n")
+                    sys.stdout.write(f"  - Uncorrectable:   {stat_uncorrectable:<6d} (Uncorr Rate: {uncorr_rate:.2f}%)\n")
+                    sys.stdout.write("--------------------------------------------------\n")
+                    sys.stdout.write("Error distribution in received blocks (0-16 bytes):\n")
+                    
+                    # Print histogram inline
+                    for err_cnt in [0, 1, 2, 3, 4, 8, 12, 16, '>16']:
+                        count = error_distribution[err_cnt]
+                        bar = "#" * min(20, int(count / max(1, stat_received) * 40))
+                        sys.stdout.write(f"  {str(err_cnt):>3s} bytes error: {count:<5d} {bar}\n")
+                    sys.stdout.write("==================================================\n")
                 sys.stdout.flush()
 
     except KeyboardInterrupt:
