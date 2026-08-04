@@ -92,7 +92,7 @@ def create_encoder(orig_w, orig_h, fps, level):
     encoder.height = enc_h
     encoder.pix_fmt = 'yuv420p'
     encoder.time_base = Fraction(1, int(fps))
-    encoder.gop_size = 5 # Extremely short I-frame interval (resilient to packet loss)
+    encoder.gop_size = 15 # Extremely short I-frame interval (resilient to packet loss)
     return encoder, enc_w, enc_h
 
 # ============================================================
