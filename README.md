@@ -14,13 +14,13 @@
 | **v1.1** | WebP | — | — | — | Tx 端編碼優化、自動 COM Port 尋找 |
 | **v2.0** | AVIF | — | — | — | 全面改用 AVIF 提升壓縮率與畫質 |
 | **v2.1** | AVIF | Super Resolution (AI) | — | — | Rx 端加入超解析度模型優化畫面 |
-| **v2.2** | AVIF | 光流法 (Optical Flow) | — | — | Rx 端加入傳統光流補幀提升流暢度 |
-| **v2.3** | AVIF | RIFE AI (實時補幀) | — | — | Rx 端改採先進 RIFE 模型，高品質 AI 補幀 |
-| **v3.0** | AVIF | — | Motion 偵測、局部動態差分 | — | Tx 端差分傳輸，大幅降低傳輸頻寬 |
-| **v3.1.0** *(Recommend)* | AVIF | Sky Mask | Motion 偵測、局部動態差分 | AES-GCM 加密 | AVIF 最終完整版 |
-| **v3.1.1*** | AVIF | Sky Mask | Motion 偵測、局部動態差分 | AES-GCM 加密 | 與 v3.1.0 相同，輸入源改為 MP4 影片檔 |
-| **v4.0.0** *(Recommend)* | **H.265** | — | Motion 偵測、局部動態差分 | — | 改用 H.265 壓縮，維持 v3.1.0 核心功能 |
-| **v4.0.1*** | **H.265** | — | Motion 偵測、局部動態差分 | — | 與 v4.0.0 相同，輸入源改為 MP4 影片檔 |
+| **v2.2** | AVIF | Super Resolution (AI) 光流法 (Optical Flow) | — | — | Rx 端加入傳統光流補幀提升流暢度 |
+| **v2.3** | AVIF | Super Resolution (AI) RIFE AI (實時補幀) | — | — | Rx 端改採先進 RIFE 模型，高品質 AI 補幀 |
+| **v3.0** | AVIF | Super Resolution (AI) RIFE AI (實時補幀) | Motion 偵測、局部動態差分 | — | Tx 端差分傳輸，大幅降低傳輸頻寬 |
+| **v3.1.0** *(Recommend)* | AVIF | Super Resolution (AI) RIFE AI (實時補幀) Sky Mask | Motion 偵測、局部動態差分 | AES-GCM 加密 | AVIF 最終完整版 |
+| **v3.1.1*** | AVIF | Super Resolution (AI) RIFE AI (實時補幀) Sky Mask | Motion 偵測、局部動態差分 | AES-GCM 加密 | 與 v3.1.0 相同，輸入源改為 MP4 影片檔 |
+| **v4.0.0** *(Recommend)* | **H.265** | Super Resolution (AI) RIFE AI (實時補幀) | Motion 偵測、局部動態差分 | AES-GCM 加密 | 改用 H.265 壓縮，維持 v3.1.0 核心功能 |
+| **v4.0.1*** | **H.265** | Super Resolution (AI) RIFE AI (實時補幀) | Motion 偵測、局部動態差分 | AES-GCM 加密 | 與 v4.0.0 相同，輸入源改為 MP4 影片檔 |
 
 ---
 
