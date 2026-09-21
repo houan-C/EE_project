@@ -1,0 +1,1 @@
+timestamp,rx_coord_raw,tx_coord_raw,rx_lat,rx_lon,tx_lat,tx_lon,calculated_distance_m,rx_bearing_deg,turn_left_accum_deg,avg_rssi_dbm,max_rssi_dbm,min_rssi_dbm,avg_kbps,sample_count

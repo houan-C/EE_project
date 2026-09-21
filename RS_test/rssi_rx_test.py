@@ -6,13 +6,14 @@ Supports iPhone default GPS coordinates DMS format (e.g. 25°0'44" 121°32'27")
 as well as standard decimal coordinates (e.g. 25.0122, 121.5408 or X, Y).
 
 Workflow:
-1. Enter Receiver Coordinate (GPS DMS like 25°0'44" 121°32'27" or X, Y) and initial compass facing bearing (0-360°).
-2. Enter Transmitter Coordinate (GPS DMS like 25°0'45" 121°32'28" or X, Y).
-3. Script automatically calculates distance between RX and TX.
-4. Record RSSI for 30 seconds to compute average RSSI and throughput.
-5. Prompt user to turn receiver LEFT by 10° (using compass for alignment), then enter 'ready'.
-6. Repeat for a full 360° rotation (36 steps).
-7. Once 360° sweep is done, prompt for a NEW Transmitter Coordinate.
+1. Choose whether to CREATE a new CSV dataset or EDIT/APPEND to an existing CSV file.
+2. Enter Receiver Coordinate (GPS DMS like 25°0'44" 121°32'27" or X, Y) and initial compass facing bearing (0-360°).
+3. Enter Transmitter Coordinate (GPS DMS like 25°0'45" 121°32'28" or X, Y).
+4. Script automatically calculates distance between RX and TX.
+5. Record RSSI for 5 seconds to compute average RSSI and throughput.
+6. Prompt user to turn receiver LEFT by 30° (using compass for alignment), then enter 'ready'.
+7. Repeat for a full 360° rotation (12 steps).
+8. Once 360° sweep is done, prompt for a NEW Transmitter Coordinate.
 """
 
 import argparse
@@ -34,9 +35,9 @@ except ImportError:
 
 DEFAULT_BAUD = 921600
 DEFAULT_CSV_PATH = "rssi_rotation_data.csv"
-DEFAULT_DURATION = 10.0  # 10 seconds average
-STEP_DEGREES = 10         # Turn 10 degrees left per step
-TOTAL_STEPS = 36          # 360 degrees / 10 degrees = 36 steps
+DEFAULT_DURATION = 5.0   # 5 seconds average
+STEP_DEGREES = 30        # Turn 30 degrees left per step
+TOTAL_STEPS = 12         # 360 degrees / 30 degrees = 12 steps
 
 
 def dms_to_dd(deg, min_val, sec_val, direction=None):
@@ -56,7 +57,6 @@ def parse_gps_coord(coord_str):
     coord_str = coord_str.strip()
     
     # Check DMS pattern matching degrees (°), minutes ('), seconds (")
-    # Matches formats like: 25°0'44", 25° 0' 44" N, 25°0'44.2"N
     dms_pattern = r"(\d+)\s*°\s*(\d+)\s*['’]\s*([\d.]+)\s*[\"”]?\s*([NSEWnsew])?"
     dms_matches = re.findall(dms_pattern, coord_str)
     
@@ -104,7 +104,7 @@ def find_serial_port():
     return ports[0].device
 
 
-def record_30s_sample(ser=None, duration=DEFAULT_DURATION, simulate=False, rx_bearing=0.0):
+def record_sample(ser=None, duration=DEFAULT_DURATION, simulate=False, rx_bearing=0.0):
     """
     Record RSSI frames and throughput over `duration` seconds.
     Returns: (avg_rssi, max_rssi, min_rssi, avg_kbps, sample_count)
@@ -195,7 +195,7 @@ def record_30s_sample(ser=None, duration=DEFAULT_DURATION, simulate=False, rx_be
 
 
 class CSVLogger:
-    """Handles logging measurement records to CSV."""
+    """Handles logging measurement records to CSV, with support for new creation or editing/appending."""
     CSV_HEADERS = [
         "timestamp",
         "rx_coord_raw",
@@ -214,15 +214,27 @@ class CSVLogger:
         "sample_count"
     ]
 
-    def __init__(self, filepath=DEFAULT_CSV_PATH):
+    def __init__(self, filepath=DEFAULT_CSV_PATH, overwrite=False):
         self.filepath = filepath
-        self._ensure_header()
+        self.overwrite = overwrite
+        self._initialize_file()
 
-    def _ensure_header(self):
-        if not os.path.exists(self.filepath):
+    def _initialize_file(self):
+        if self.overwrite or not os.path.exists(self.filepath):
             with open(self.filepath, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 writer.writerow(self.CSV_HEADERS)
+
+    def count_records(self):
+        if not os.path.exists(self.filepath):
+            return 0
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                return max(len(rows) - 1, 0)
+        except Exception:
+            return 0
 
     def log(self, rx_raw, tx_raw, rx_lat, rx_lon, tx_lat, tx_lon, distance_m, rx_bearing, turn_accum, avg_rssi, max_rssi, min_rssi, avg_kbps, sample_count):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -257,12 +269,57 @@ def prompt_input(text):
     return val
 
 
+def select_csv_mode(default_filepath):
+    """
+    Prompt user to select dataset operation mode:
+      [1] Create a NEW CSV file (overwrite/reset)
+      [2] Edit / Append to existing CSV file
+    Returns: (filepath, overwrite_bool)
+    """
+    print("\nPlease select CSV Dataset Mode:")
+    print(f"  [1] Create a NEW dataset (reset CSV file)")
+    print(f"  [2] Edit / Append to existing CSV file ('{default_filepath}')")
+    print("  [ESC/q] Exit")
+
+    choice = prompt_input("\nEnter choice [1/2/esc]: ")
+    if choice is None:
+        print("Exiting.")
+        sys.exit(0)
+
+    if choice == "1":
+        file_input = prompt_input(f"Enter file path for NEW CSV dataset [Press Enter for '{default_filepath}']: ")
+        if file_input is None:
+            print("Exiting.")
+            sys.exit(0)
+        target_path = file_input if file_input else default_filepath
+        print(f"--> Creating NEW CSV dataset: {os.path.abspath(target_path)}")
+        return target_path, True
+
+    elif choice == "2":
+        file_input = prompt_input(f"Enter file path of existing CSV dataset [Press Enter for '{default_filepath}']: ")
+        if file_input is None:
+            print("Exiting.")
+            sys.exit(0)
+        target_path = file_input if file_input else default_filepath
+        
+        if os.path.exists(target_path):
+            existing_count = CSVLogger(target_path, overwrite=False).count_records()
+            print(f"--> Appending to existing CSV dataset: {os.path.abspath(target_path)} ({existing_count} records currently)")
+        else:
+            print(f"--> Target CSV file '{target_path}' does not exist yet. A new file will be created.")
+        return target_path, False
+
+    else:
+        print("Invalid choice. Defaulting to Append mode.")
+        return default_filepath, False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Receiver 360° RSSI Rotation Test Script (iPhone GPS Supported)")
     parser.add_argument("--port", default=None, help="RX serial port (default: auto-detect)")
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD, help="Serial baud rate (default: 921600)")
     parser.add_argument("--csv", default=DEFAULT_CSV_PATH, help="CSV file path (default: rssi_rotation_data.csv)")
-    parser.add_argument("--duration", type=float, default=DEFAULT_DURATION, help="Sampling duration per step in seconds (default: 30)")
+    parser.add_argument("--duration", type=float, default=DEFAULT_DURATION, help="Sampling duration per step in seconds (default: 5.0)")
     parser.add_argument("--simulate", action="store_true", help="Run in simulation mode without serial hardware")
     args = parser.parse_args()
 
@@ -271,8 +328,9 @@ def main():
     print("       (Supports iPhone GPS format e.g. 25°0'44\" 121°32'27\")      ")
     print("=" * 72)
 
-    logger = CSVLogger(args.csv)
-    print(f"Logging data to: {os.path.abspath(args.csv)}\n")
+    # Prompt user for CSV mode (Create New vs Edit/Append)
+    csv_path, overwrite_flag = select_csv_mode(args.csv)
+    logger = CSVLogger(csv_path, overwrite=overwrite_flag)
 
     # Connect serial port or use simulation
     ser = None
@@ -281,7 +339,7 @@ def main():
     if not simulate_mode:
         port = args.port if args.port else find_serial_port()
         if not port:
-            print("Notice: No serial port found. Enable SIMULATION mode? (y/n)")
+            print("\nNotice: No serial port found. Enable SIMULATION mode? (y/n)")
             ans = input("> ").strip().lower()
             if ans in ["y", "yes"]:
                 simulate_mode = True
@@ -299,7 +357,7 @@ def main():
                 simulate_mode = True
 
     # Step 1: Input Receiver Coordinate & Initial Facing
-    print("--- [RECEIVER SETUP] ---")
+    print("\n--- [RECEIVER SETUP] ---")
     while True:
         rx_raw = prompt_input("Enter Receiver Coordinate (iPhone GPS e.g. 25°0'44\" 121°32'27\" or X,Y): ")
         if rx_raw is None:
@@ -348,19 +406,19 @@ def main():
                 print(f"  Notice: Coordinate treated as raw position ({err})")
 
             print(f"\n>> Transmitter placed at: '{tx_raw}'")
-            print(f">> Starting 360° Rotation Test (36 steps x 30s average)...")
+            print(f">> Starting 360° Rotation Test ({TOTAL_STEPS} steps x {STEP_DEGREES}° x {args.duration}s)...")
             print("-" * 72)
 
-            # Step 3: Inner 360° rotation loop (36 steps of 10°)
+            # Step 3: Inner 360° rotation loop (12 steps of 30°)
             current_facing = initial_facing
 
             for step in range(1, TOTAL_STEPS + 1):
                 turn_accum = (step - 1) * STEP_DEGREES
                 
                 print(f"\n>>> Step {step}/{TOTAL_STEPS} | Turned Accum: {turn_accum}° | Compass Bearing: {current_facing:.1f}°")
-                print(f"Starting 30-second RSSI recording for TX at {tx_raw}...")
+                print(f"Starting {args.duration:g}-second RSSI recording for TX at {tx_raw}...")
 
-                avg_rssi, max_rssi, min_rssi, avg_kbps, samples = record_30s_sample(
+                avg_rssi, max_rssi, min_rssi, avg_kbps, samples = record_sample(
                     ser=ser,
                     duration=args.duration,
                     simulate=simulate_mode,
@@ -368,7 +426,7 @@ def main():
                 )
 
                 if samples > 0 and avg_rssi is not None:
-                    print(f"[30s OK] Avg RSSI: {avg_rssi:.2f} dBm (Max: {max_rssi:.1f}, Min: {min_rssi:.1f}) | Throughput: {avg_kbps:.2f} kb/s | Samples: {samples}")
+                    print(f"[{args.duration:g}s OK] Avg RSSI: {avg_rssi:.2f} dBm (Max: {max_rssi:.1f}, Min: {min_rssi:.1f}) | Throughput: {avg_kbps:.2f} kb/s | Samples: {samples}")
                     logger.log(
                         rx_raw=rx_raw,
                         tx_raw=tx_raw,
@@ -388,11 +446,11 @@ def main():
                 else:
                     print("[!] Warning: Sampling failed or 0 frames received. Point skipped.")
 
-                # If not the last step, prompt user to turn left 10 degrees
+                # If not the last step, prompt user to turn left STEP_DEGREES
                 if step < TOTAL_STEPS:
                     next_facing = (current_facing - STEP_DEGREES) % 360.0
                     print("\n" + "-" * 50)
-                    print(f"  [ACTION REQUIRED] Turn receiver LEFT by 10°")
+                    print(f"  [ACTION REQUIRED] Turn receiver LEFT by {STEP_DEGREES}°")
                     print(f"  Current Bearing: {current_facing:.1f}°  -->  Target Bearing: {next_facing:.1f}°")
                     print("  Please use compass to align receiver to target bearing.")
                     print("-" * 50)
@@ -411,7 +469,7 @@ def main():
     finally:
         if ser:
             ser.close()
-        print(f"Data successfully saved to: {os.path.abspath(args.csv)}")
+        print(f"Data successfully saved to: {os.path.abspath(csv_path)}")
 
 
 if __name__ == "__main__":
