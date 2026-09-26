@@ -51,7 +51,7 @@ except Exception as e:
     sys.exit(1)
 
 # ============================================================
-# === H.265 GPU Encoder Setup ===
+# === H.265 CPU Encoder Setup ===
 # ============================================================
 def create_encoder(orig_w, orig_h, fps, level):
     settings = {
@@ -68,29 +68,19 @@ def create_encoder(orig_w, orig_h, fps, level):
     enc_w -= (enc_w % 2)
     enc_h -= (enc_h % 2)
     
-    try:
-        # NVENC 硬體加速編碼器
-        encoder = av.CodecContext.create('hevc_nvenc', 'w')
-        encoder.options = {
-            'preset': 'p4',       
-            'tune': 'ull',        
-            'rc': 'vbr',          
-            'cq': s['crf']        
-        }
-    except Exception:
-        # 退回使用 CPU 編碼器
-        encoder = av.CodecContext.create('hevc', 'w')
-        encoder.options = {
-            'preset': 'ultrafast',
-            'tune': 'zerolatency',
-            'crf': s['crf']
-        }
+    # 強制使用 CPU 編碼器 (移除 NVENC)
+    encoder = av.CodecContext.create('hevc', 'w')
+    encoder.options = {
+        'preset': 'ultrafast',
+        'tune': 'zerolatency',
+        'crf': s['crf']
+    }
         
     encoder.width = enc_w
     encoder.height = enc_h
     encoder.pix_fmt = 'yuv420p'
     encoder.time_base = Fraction(1, int(fps))
-    encoder.gop_size = 15 # Extremely short I-frame interval (resilient to packet loss)
+    encoder.gop_size = 5 # Extremely short I-frame interval (resilient to packet loss)
     return encoder, enc_w, enc_h
 
 # ============================================================
@@ -182,7 +172,7 @@ def main():
     
     last_sent_size = 0
     last_decoded_bgr = None
-    window_name = 'TX_H265_Stream'
+    window_name = 'TX_H265_CPU_Stream'
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
 
@@ -256,7 +246,7 @@ def main():
         disp = np.hstack((frame, preview))
         
         # Draw on left side (Raw)
-        cv2.putText(disp, f"TX H.265 (Raw Input)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.putText(disp, f"TX H.265 CPU (Raw Input)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
         status_color = (0, 0, 255) if tx_busy else (200, 200, 200)
         cv2.putText(disp, f"Status: {'BUSY (Dropping Input)' if tx_busy else 'ENCODING'}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_color, 2, cv2.LINE_AA)
         cv2.putText(disp, f"Loop Time: {end_time - start_time:.3f}s", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2, cv2.LINE_AA)
