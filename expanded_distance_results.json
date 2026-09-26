@@ -1,0 +1,142 @@
+[
+    {
+        "distance_km": 0.05,
+        "rssi_dbm": -37.0,
+        "packet_success_rate": 100.0,
+        "avif_valid_fps": 17.01,
+        "h265_valid_fps": 29.97,
+        "avif_bw_limited_fps": 17.01,
+        "h265_bw_limited_fps": 29.97,
+        "best_choice": "H.265"
+    },
+    {
+        "distance_km": 0.1,
+        "rssi_dbm": -40.0,
+        "packet_success_rate": 99.9,
+        "avif_valid_fps": 16.9,
+        "h265_valid_fps": 29.01,
+        "avif_bw_limited_fps": 16.9,
+        "h265_bw_limited_fps": 29.01,
+        "best_choice": "H.265"
+    },
+    {
+        "distance_km": 0.2,
+        "rssi_dbm": -43.0,
+        "packet_success_rate": 99.5,
+        "avif_valid_fps": 16.45,
+        "h265_valid_fps": 25.53,
+        "avif_bw_limited_fps": 16.45,
+        "h265_bw_limited_fps": 25.53,
+        "best_choice": "H.265"
+    },
+    {
+        "distance_km": 0.4,
+        "rssi_dbm": -47.0,
+        "packet_success_rate": 98.5,
+        "avif_valid_fps": 15.38,
+        "h265_valid_fps": 18.89,
+        "avif_bw_limited_fps": 15.38,
+        "h265_bw_limited_fps": 18.89,
+        "best_choice": "H.265"
+    },
+    {
+        "distance_km": 0.6,
+        "rssi_dbm": -42.6,
+        "packet_success_rate": 100.0,
+        "avif_valid_fps": 17.01,
+        "h265_valid_fps": 29.97,
+        "avif_bw_limited_fps": 17.01,
+        "h265_bw_limited_fps": 29.97,
+        "best_choice": "H.265"
+    },
+    {
+        "distance_km": 0.8,
+        "rssi_dbm": -46.8,
+        "packet_success_rate": 100.0,
+        "avif_valid_fps": 17.01,
+        "h265_valid_fps": 29.97,
+        "avif_bw_limited_fps": 17.01,
+        "h265_bw_limited_fps": 29.97,
+        "best_choice": "H.265"
+    },
+    {
+        "distance_km": 1.0,
+        "rssi_dbm": -50.0,
+        "packet_success_rate": 95.0,
+        "avif_valid_fps": 12.09,
+        "h265_valid_fps": 7.97,
+        "avif_bw_limited_fps": 12.09,
+        "h265_bw_limited_fps": 7.97,
+        "best_choice": "AVIF"
+    },
+    {
+        "distance_km": 1.2,
+        "rssi_dbm": -52.6,
+        "packet_success_rate": 87.11,
+        "avif_valid_fps": 6.81,
+        "h265_valid_fps": 2.31,
+        "avif_bw_limited_fps": 6.81,
+        "h265_bw_limited_fps": 2.31,
+        "best_choice": "AVIF"
+    },
+    {
+        "distance_km": 1.5,
+        "rssi_dbm": -55.8,
+        "packet_success_rate": 77.45,
+        "avif_valid_fps": 3.15,
+        "h265_valid_fps": 0.82,
+        "avif_bw_limited_fps": 3.15,
+        "h265_bw_limited_fps": 0.82,
+        "best_choice": "AVIF"
+    },
+    {
+        "distance_km": 2.0,
+        "rssi_dbm": -60.0,
+        "packet_success_rate": 65.0,
+        "avif_valid_fps": 1.01,
+        "h265_valid_fps": 0.26,
+        "avif_bw_limited_fps": 1.01,
+        "h265_bw_limited_fps": 0.26,
+        "best_choice": "AVIF"
+    },
+    {
+        "distance_km": 3.0,
+        "rssi_dbm": -65.8,
+        "packet_success_rate": 47.45,
+        "avif_valid_fps": 0.14,
+        "h265_valid_fps": 0.05,
+        "avif_bw_limited_fps": 0.14,
+        "h265_bw_limited_fps": 0.05,
+        "best_choice": "AVIF"
+    },
+    {
+        "distance_km": 4.0,
+        "rssi_dbm": -70.0,
+        "packet_success_rate": 35.0,
+        "avif_valid_fps": 0.02,
+        "h265_valid_fps": 0.01,
+        "avif_bw_limited_fps": 0.02,
+        "h265_bw_limited_fps": 0.01,
+        "best_choice": "AVIF"
+    },
+    {
+        "distance_km": 6.0,
+        "rssi_dbm": -75.8,
+        "packet_success_rate": 17.45,
+        "avif_valid_fps": 0.0,
+        "h265_valid_fps": 0.0,
+        "avif_bw_limited_fps": 0.0,
+        "h265_bw_limited_fps": 0.0,
+        "best_choice": "H.265"
+    },
+    {
+        "distance_km": 8.0,
+        "rssi_dbm": -80.0,
+        "packet_success_rate": 5.0,
+        "avif_valid_fps": 0.0,
+        "h265_valid_fps": 0.0,
+        "avif_bw_limited_fps": 0.0,
+        "h265_bw_limited_fps": 0.0,
+        "best_choice": "H.265"
+    }
+]

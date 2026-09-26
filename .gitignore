@@ -14,3 +14,10 @@ filghtRecord/5.csv
 filghtRecord/6.csv
 
 RS/drone/
+
+# Virtual Environment
+.venv/
+venv/
+
+*.mp4
+*.avi
