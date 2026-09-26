@@ -18,3 +18,6 @@ RS/drone/
 # Virtual Environment
 .venv/
 venv/
+
+*.mp4
+*.avi
