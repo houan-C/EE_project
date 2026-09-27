@@ -38,9 +38,10 @@ except ImportError:
     _HAS_TRT = False
 
 # --- CONFIG ---
-TEST_DISTANCE = 0.20
+TEST_DISTANCE = 0.00
 
 DISTANCE_TABLE = {
+    0.00: {'delivery': 1.000, 'fps': 30.00},
     0.05: {'delivery': 1.000, 'fps': 17.01},
     0.10: {'delivery': 0.999, 'fps': 16.90},
     0.20: {'delivery': 0.995, 'fps': 16.45},
@@ -246,9 +247,15 @@ def main():
     }
     ratio, quality = TX_SETTINGS.get(args.level, [0.59, 25])
 
-    if args.distance in DISTANCE_TABLE:
-        d_rate = DISTANCE_TABLE[args.distance]['delivery']
-        t_fps = DISTANCE_TABLE[args.distance]['fps']
+    matched_entry = None
+    for dist_val, info in DISTANCE_TABLE.items():
+        if abs(args.distance - dist_val) < 1e-3:
+            matched_entry = info
+            break
+
+    if matched_entry is not None:
+        d_rate = matched_entry['delivery']
+        t_fps = matched_entry['fps']
     else:
         d_rate = DELIVERY_RATE
         t_fps = TX_TARGET_FPS
@@ -269,6 +276,13 @@ def main():
     if not cap.isOpened():
         print(f"[Error] Cannot open {args.video}")
         return
+
+    # If distance is 0.00km (ideal transmission), synchronize target FPS to actual video FPS
+    src_video_fps = cap.get(cv2.CAP_PROP_FPS)
+    if abs(args.distance) < 1e-3:
+        d_rate = 1.000
+        if src_video_fps > 0 and not np.isnan(src_video_fps):
+            t_fps = round(src_video_fps, 2)
 
     # Calculate 16:9 TX Canvas size
     raw_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -401,8 +415,8 @@ def main():
 
         prev_gray = curr_gray.copy()
 
-        # Decide if we send based on target FPS
-        if (curr_time - last_tx_time) >= (1.0 / t_fps):
+        # Decide if we send based on target FPS (If 0.00 km, send every frame smoothly)
+        if abs(args.distance) < 1e-3 or (curr_time - last_tx_time) >= (1.0 / t_fps - 0.002):
             last_tx_time = curr_time
             
             raw_acc_dx = total_camera_dx - last_sent_dx
@@ -523,8 +537,8 @@ def main():
                     ch, cw = target_crop.shape[:2]
                     tx_mock_bg[cy:cy+ch, cx:cx+cw] = cv2.cvtColor(target_crop, cv2.COLOR_BGR2GRAY)
                 
-                # Channel Simulation (Packet Drop)
-                if random.random() <= d_rate:
+                # Channel Simulation (Packet Drop) - 0.00 km is 100% guaranteed delivery
+                if abs(args.distance) < 1e-3 or random.random() <= d_rate:
                     # RX Decode
                     try:
                         dec_pil = Image.open(io.BytesIO(frame_bytes))
@@ -680,7 +694,7 @@ def main():
         print(f"{'指標項目':<22} | {'未經 AI 優化 (Baseline)':<22} | {'經 AI 重建 (With AI)':<22} | {'改善幅度 (Improvement)':<18}")
         print("-"*88)
         print(f"{'【RealESRGAN 畫質重建】':<22} | {'':<22} | {'':<22} |")
-        print(f"  解析度 (Resolution)  | {'320x240 (雙線性放大)':<22} | {'1280x960 (4x 超解析度)':<22} | {'+4x 解析度提升'}")
+        print(f"  解析度 (Resolution)  | {f'{new_w}x{new_h} (雙線性放大)':<22} | {f'{TARGET_W}x{TARGET_H} (4x 超解析度)':<22} | {'+4x 解析度提升'}")
         print(f"  SSIM 結構相似性 (↑)  | {avg_s_no:<22.4f} | {avg_s_ai:<22.4f} | {d_ssim:+.4f} ({p_ssim:+.1f}%)")
         print(f"  LPIPS 感知失真 (↓)   | {avg_l_no:<22.4f} | {avg_l_ai:<22.4f} | {d_lpips:+.4f} ({p_lpips:+.1f}%)")
         print(f"  Sharpness 銳利度 (↑) | {avg_sh_no:<22.1f} | {avg_sh_ai:<22.1f} | {d_sharp:+.1f} ({m_sharp:.2f}x 銳利)")
