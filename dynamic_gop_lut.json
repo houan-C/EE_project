@@ -1,0 +1,14 @@
+[
+    {
+        "start_km": 0.05,
+        "end_km": 1.141,
+        "optimal_gop": 2,
+        "avg_fps_at_mid": 30.0
+    },
+    {
+        "start_km": 1.145,
+        "end_km": 4.0,
+        "optimal_gop": 1,
+        "avg_fps_at_mid": 2.43
+    }
+]
