@@ -54,7 +54,7 @@ except Exception as e:
     sys.exit(1)
 
 # ============================================================
-# === H.265 GPU Encoder Setup ===
+# === H.265 CPU Encoder Setup ===
 # ============================================================
 def create_encoder(orig_w, orig_h, fps, level):
     settings = {
@@ -71,28 +71,19 @@ def create_encoder(orig_w, orig_h, fps, level):
     enc_w -= (enc_w % 2)
     enc_h -= (enc_h % 2)
     
-    try:
-        # NVENC 蝖祇??楊蝣澆
-        encoder = av.CodecContext.create('hevc_nvenc', 'w')
-        encoder.options = {
-            'preset': 'p4',       
-            'tune': 'ull',        
-            'rc': 'vbr',          
-            'cq': s['crf']        
-        }
-    except Exception:
-        # ??蝙??CPU 蝺函Ⅳ??        encoder = av.CodecContext.create('hevc', 'w')
-        encoder.options = {
-            'preset': 'ultrafast',
-            'tune': 'zerolatency',
-            'crf': s['crf']
-        }
+    # 使用 CPU 軟體編碼 (libx265)，不使用 GPU
+    encoder = av.CodecContext.create('hevc', 'w')
+    encoder.options = {
+        'preset': 'ultrafast',
+        'tune': 'zerolatency',
+        'crf': s['crf']
+    }
         
     encoder.width = enc_w
     encoder.height = enc_h
     encoder.pix_fmt = 'yuv420p'
     encoder.time_base = Fraction(1, int(fps))
-    encoder.gop_size = 15 # Extremely short I-frame interval (resilient to packet loss)
+    encoder.gop_size = 5 # Extremely short I-frame interval (resilient to packet loss)
     return encoder, enc_w, enc_h
 
 # ============================================================
