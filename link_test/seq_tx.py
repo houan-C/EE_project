@@ -49,6 +49,23 @@ assert MAGIC not in PADDING
 
 SEGMENT_GAP_S = 2.0   # 段落之間停多久（要大於韌體 100 ms 的 flush timeout）
 
+# 2026-10-16 實測發現：TX 端只會以 32 bytes 為單位把 UART 資料交給韌體，
+# 不滿 32 bytes 的尾巴會卡住，直到下一批資料進來。
+# 所以每個段落結束時補一段「填充封包」，讓累計寫入量剛好是 32 的倍數，
+# 卡住的位元組歸零，下一段的封包邊界才會對齊。前提是開始時沒有卡住的位元組
+# （TX 板剛插上 USB，或由 run_rate_sweep.py 先校正過）。
+PAD_MAGIC = b'\xA7PAD'
+ALIGN = 32
+
+
+def build_pad(total_written):
+    n = (-total_written) % ALIGN
+    if n == 0:
+        return b''
+    if n < len(PAD_MAGIC) + 4:
+        n += ALIGN
+    return PAD_MAGIC + bytes(n - len(PAD_MAGIC))
+
 
 def build_packet(seq, seg_id, rate, seg_index, seg_total, tx_time=None):
     if tx_time is None:
@@ -167,6 +184,7 @@ def main():
     log_rows = []
 
     seq = 0
+    total_written = 0
     aborted = False
     try:
         for seg_id, (rate, dur) in enumerate(segments):
@@ -186,6 +204,7 @@ def main():
                 else:
                     max_lag = max(max_lag, now - target)
                 ser.write(build_packet(seq, seg_id, rate, idx, seg_total))
+                total_written += PKT_LEN
                 seq += 1
                 sent += 1
                 now = time.perf_counter()
@@ -193,6 +212,10 @@ def main():
                     last_print = now
                     lag_warn = "  [!] 電腦送不及，實際速率低於設定" if now - target > 0.5 else ""
                     print(f"\r  已送 {sent}/{seg_total}{lag_warn}      ", end='', flush=True)
+            pad = build_pad(total_written)
+            if pad:
+                ser.write(pad)
+                total_written += len(pad)
             elapsed = time.perf_counter() - t0
             actual_rate = sent / elapsed if elapsed > 0 else 0.0
             print(f"\r  已送 {sent}/{seg_total}，實際 {actual_rate:.1f} 包/秒，最大延遲 {max_lag * 1000:.0f} ms")

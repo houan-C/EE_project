@@ -41,6 +41,7 @@ MAGIC = b'\xA7SEQ'
 HDR_FMT = '<4sIHHIId'          # magic, seq, seg_id, rate, seg_index, seg_total, tx_time
 HDR_LEN = struct.calcsize(HDR_FMT)   # 28
 MAX_FW_LEN = 240                     # 韌體 MAX_LENGTH
+PAD_MAGIC = b'\xA7PAD'              # seq_tx.py 每段結尾的填充封包（對齊 32 bytes 用），不列入統計
 RAW_CHUNK_HDR = '<dI'                # raw.bin：每一段 = (收到時間, 長度) + 資料
 RAW_CHUNK_HDR_LEN = struct.calcsize(RAW_CHUNK_HDR)
 
@@ -90,7 +91,7 @@ class FirmwareStreamParser:
                 continue
             if len(self.buf) < L + 3:
                 break
-            if self.buf[1:5] != MAGIC:
+            if self.buf[1:5] != MAGIC and self.buf[1:5] != PAD_MAGIC:
                 # 內容開頭不是我們的標記：可能是 UART 上的雜訊，也可能是 TX 端位元組錯位。
                 # 用下一筆紀錄的長度位元組來判斷：錯位時每一筆長度都一樣，雜訊則不會。
                 if len(self.buf) < L + 4:
@@ -134,12 +135,16 @@ class Stats:
         self.misaligned = 0
         self.foreign = 0
         self.short = 0
+        self.pads = 0
         self.records = 0
 
     def add(self, payload, rssi, status, rx_time):
         """回傳要寫進 packets.csv 的一列（或 None）"""
         self.records += 1
         L = len(payload)
+        if payload[:4] == PAD_MAGIC:
+            self.pads += 1
+            return [f"{rx_time:.6f}", '', '', '', '', '', rssi, f"{status:02X}", L, 0, 'pad', '']
         if payload[:4] != MAGIC:
             if MAGIC in payload:
                 self.misaligned += 1
